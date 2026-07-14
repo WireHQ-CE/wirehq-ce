@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+#
+# commit-msg — enforce Conventional Commits (docs/GIT.md §3.1).
+#
+# Header must be:  <type>(<optional-scope>)<optional-!>: <subject>
+#   type    one of: feat fix docs refactor test build ci chore perf style revert
+#   scope   optional, lowercase kebab/slash (e.g. wireguard, wireguard/ui, web)
+#   !       optional breaking-change marker (feat!: or feat(api)!:)
+#   subject imperative, lowercase start preferred, no trailing period
+#
+# Merge/revert/autosquash commits are exempt. Subject >72 chars warns (does not block).
+# Bypass in a real emergency with:  git commit --no-verify   (discouraged — CI still checks).
+
+set -euo pipefail
+
+msg_file="$1"
+# First non-comment, non-blank line is the header.
+header="$(grep -vE '^\s*#' "$msg_file" | grep -vE '^\s*$' | head -n1 || true)"
+
+# Exempt machine-generated / non-conventional commit kinds.
+case "$header" in
+  "Merge "*|"Revert "*|"fixup! "*|"squash! "*|"amend! "*)
+    exit 0 ;;
+esac
+
+types='feat|fix|docs|refactor|test|build|ci|chore|perf|style|revert'
+pattern="^(${types})(\([a-z0-9._/-]+\))?!?: .+"
+
+if [[ ! "$header" =~ $pattern ]]; then
+  cat >&2 <<EOF
+✖ Commit message does not follow Conventional Commits (docs/GIT.md §3.1).
+
+  Got:      $header
+  Expected: <type>(<scope>): <subject>
+  Types:    feat fix docs refactor test build ci chore perf style revert
+  Examples: feat(wireguard/ui): add instances list and detail pages
+            fix(api): return 409 on duplicate peer ip
+            docs: refresh handoff for the release pipeline
+
+Fix the message (git commit --amend) and retry. Emergency bypass: --no-verify.
+EOF
+  exit 1
+fi
+
+# Soft length guidance on the subject (everything after "type(scope): ").
+subject="${header#*: }"
+if [[ ${#subject} -gt 72 ]]; then
+  echo "⚠ Commit subject is ${#subject} chars (>72). Consider shortening (docs/GIT.md §3.2)." >&2
+fi
+
+exit 0

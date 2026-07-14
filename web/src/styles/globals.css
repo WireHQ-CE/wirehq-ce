@@ -1,0 +1,260 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: #ffffff;
+    --surface: #f7f8fa;
+    --border: #e2e5ea;
+    --text: #12151b;
+    --text-muted: #6b7280;
+    --ring: #ffc23c;
+  }
+
+  .dark {
+    --bg: #0a0b0d;
+    --surface: #12151b;
+    --border: #222730;
+    --text: #f7f8fa;
+    --text-muted: #9aa1ad;
+    --ring: #ffc23c;
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-feature-settings: 'cv11', 'ss01';
+    @apply font-sans text-base;
+  }
+
+  /* Focus is a security/accessibility feature — always visible, never removed. */
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ring);
+    border-radius: 6px;
+  }
+
+  ::selection {
+    background-color: rgba(245, 179, 1, 0.25);
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/*
+ * CMS content styling. Public page bodies are operator-authored HTML rendered into `.cms-content`
+ * (and previewed in the same class inside the rich-text editor). Tailwind purges utility classes, so
+ * stored HTML CANNOT use Tailwind utilities — all styling here targets plain tags plus a small set of
+ * named content classes (cms-grid, cms-card, pricing-grid, pricing-card, pill, checks, cms-cta,
+ * cms-btn) that the seeded markup opts into.
+ */
+@layer components {
+  .cms-content {
+    color: var(--text);
+    font-size: 1.0625rem;
+    line-height: 1.7;
+  }
+  .cms-content > :first-child { margin-top: 0; }
+  .cms-content > :last-child { margin-bottom: 0; }
+
+  .cms-content h2 {
+    margin: 2.75rem 0 1rem;
+    font-size: 1.5rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+  .cms-content h3 {
+    margin: 1.75rem 0 0.5rem;
+    font-size: 1.1875rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .cms-content p { margin: 1rem 0; }
+  .cms-content strong { font-weight: 650; color: var(--text); }
+  .cms-content em { font-style: italic; }
+  .cms-content small { font-size: 0.8125rem; color: var(--text-muted); }
+
+  .cms-content a {
+    color: #b36f02;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .cms-content a:hover { color: #8f5708; }
+  .dark .cms-content a { color: #fcd34d; }
+  .dark .cms-content a:hover { color: #ffc23c; }
+
+  .cms-content ul,
+  .cms-content ol { margin: 1rem 0; padding-left: 1.4rem; }
+  .cms-content ul { list-style: disc; }
+  .cms-content ol { list-style: decimal; }
+  .cms-content li { margin: 0.4rem 0; }
+
+  .cms-content blockquote {
+    margin: 1.5rem 0;
+    padding: 0.75rem 1.1rem;
+    border-left: 3px solid #f5b301;
+    background: var(--surface);
+    border-radius: 0 8px 8px 0;
+    color: var(--text-muted);
+  }
+  .cms-content blockquote p { margin: 0; }
+
+  .cms-content code {
+    font-family: theme('fontFamily.mono');
+    font-size: 0.85em;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1rem 0.35rem;
+  }
+
+  .cms-content hr { margin: 2rem 0; border: 0; border-top: 1px solid var(--border); }
+
+  .cms-content table {
+    width: 100%;
+    margin: 1.5rem 0;
+    border-collapse: collapse;
+    font-size: 0.9375rem;
+  }
+  .cms-content th,
+  .cms-content td {
+    border: 1px solid var(--border);
+    padding: 0.6rem 0.8rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  .cms-content thead th {
+    background: var(--surface);
+    font-weight: 600;
+  }
+
+  /* --- named layout helpers used by seeded content --- */
+  /* Bento grid that mirrors the home page's feature section: cells sit flush on the page colour with
+     hairline dividers from the grid's background showing through the 1px gaps. */
+  .cms-content .cms-grid {
+    display: grid;
+    gap: 1px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    margin: 1.75rem 0;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .cms-content .cms-card {
+    border: 0;
+    border-radius: 0;
+    padding: 1.5rem;
+    background: var(--bg);
+  }
+  .cms-content .cms-card h3 { margin-top: 0; }
+  .cms-content .cms-card p:last-child { margin-bottom: 0; }
+  .cms-content .cms-card p { color: var(--text-muted); }
+
+  .cms-content .pricing-grid {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    margin: 1.5rem 0;
+    align-items: start;
+  }
+  .cms-content .pricing-card {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    background: var(--surface);
+  }
+  .cms-content .pricing-card.featured {
+    border-color: #f5b301;
+    box-shadow: 0 0 0 1px #f5b301, 0 16px 48px rgba(16, 21, 27, 0.16);
+  }
+  .cms-content .pricing-card ul { margin-top: 0.5rem; flex: 1; }
+  .cms-content .price {
+    margin: 0.75rem 0 0.25rem;
+    font-size: 2.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .cms-content .price .per {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+  .cms-content .pill {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    background: rgba(245, 179, 1, 0.15);
+    color: #8f5708;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .dark .cms-content .pill { color: #fcd34d; }
+
+  .cms-content ul.checks { list-style: none; padding-left: 0; }
+  .cms-content ul.checks li {
+    position: relative;
+    padding-left: 1.6rem;
+    margin: 0.5rem 0;
+  }
+  .cms-content ul.checks li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: #d98e00;
+    font-weight: 700;
+  }
+
+  .cms-content .cms-cta {
+    margin: 2.75rem 0 0.5rem;
+    padding: 2.5rem;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--surface);
+    text-align: center;
+  }
+  .cms-content .cms-cta h3 { margin-top: 0; font-size: 1.375rem; }
+
+  /* Buttons: scoped with `a.cms-btn` so the dark-link colour rule (`.dark .cms-content a`) can't win on
+     specificity — keeps the gold buttons dark-on-gold, matching the app's primary button. */
+  .cms-content a.cms-btn,
+  .dark .cms-content a.cms-btn {
+    display: inline-block;
+    margin: 0.35rem 0.3rem 0;
+    padding: 0.7rem 1.35rem;
+    border-radius: 8px;
+    background: #f5b301;
+    color: #0a0b0d;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1px solid transparent;
+  }
+  .cms-content a.cms-btn:hover,
+  .dark .cms-content a.cms-btn:hover { background: #d98e00; color: #0a0b0d; }
+  .cms-content a.cms-btn.ghost,
+  .dark .cms-content a.cms-btn.ghost {
+    background: transparent;
+    color: var(--text);
+    border-color: var(--border);
+  }
+  .cms-content a.cms-btn.ghost:hover,
+  .dark .cms-content a.cms-btn.ghost:hover { background: var(--surface); color: var(--text); }
+}

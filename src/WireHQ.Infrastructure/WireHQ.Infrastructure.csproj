@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Persistence + adapters. Implements the Application ports (IApplicationDbContext, IAuditWriter,
+    IPermissionService, IDateTimeProvider). This is the ONLY place Npgsql and the concrete
+    DbContext live, so the provider is swappable without touching Domain/Application.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>WireHQ.Infrastructure</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WireHQ.Application\WireHQ.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- RLS policy script (ADR-027), applied on boot by ApplicationDbContextInitializer. -->
+    <EmbeddedResource Include="Persistence\Rls\rls.sql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="EFCore.NamingConventions" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="MailKit" />
+    <PackageReference Include="Stripe.net" />
+    <PackageReference Include="DnsClient" />
+    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" />
+    <PackageReference Include="ITfoxtec.Identity.Saml2" />
+    <PackageReference Include="Novell.Directory.Ldap.NETStandard" />
+  </ItemGroup>
+
+</Project>

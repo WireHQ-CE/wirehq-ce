@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The enterprise model. Pure C# — no EF Core, no ASP.NET, no MediatR. The only reference
+    is the dependency-free Shared kernel. Keeping the Domain framework-free is what lets the
+    business rules outlive any framework choice.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>WireHQ.Domain</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WireHQ.Shared\WireHQ.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

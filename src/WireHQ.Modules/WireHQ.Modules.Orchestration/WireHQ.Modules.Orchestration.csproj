@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Remote Orchestration module — the deployment-job engine that drives WireGuard configuration
+    onto local/remote targets through the IWireGuardProvider seam, while VPN traffic never traverses
+    WireHQ. Depends on Application (→ Domain, Shared), the module contract, and the WireGuard module
+    (the provider seam + instance model). Contributes the "orch" schema + endpoints; the Api host
+    discovers it via IModule. (docs/12-remote-orchestration.md)
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>WireHQ.Modules.Orchestration</RootNamespace>
+  </PropertyGroup>
+
+  <!-- ASP.NET shared framework gives endpoint routing + hosting (BackgroundService) + Microsoft.Extensions.*. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\WireHQ.Application\WireHQ.Application.csproj" />
+    <ProjectReference Include="..\WireHQ.Modules.Abstractions\WireHQ.Modules.Abstractions.csproj" />
+    <ProjectReference Include="..\WireHQ.Modules.WireGuard\WireHQ.Modules.WireGuard.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="SSH.NET" />
+  </ItemGroup>
+
+</Project>

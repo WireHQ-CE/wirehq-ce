@@ -1,0 +1,23 @@
+[Unit]
+Description=WireHQ Agent (outbound-only mTLS WireGuard agent)
+Documentation=https://github.com/WireHQ-CE/wirehq-ce/blob/main/docs/13-agent.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Enrol once before starting:  wirehq-agent enroll --server <url> --token <token>
+ExecStart=/usr/local/bin/wirehq-agent run --server %i
+Restart=on-failure
+RestartSec=10
+
+# Least privilege: only what's needed to manage the WireGuard interface.
+AmbientCapabilities=CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_ADMIN
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/etc/wireguard /var/lib/wirehq-agent
+StateDirectory=wirehq-agent
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Licence-token cryptography. Signs and verifies the marketplace's licence keys and activation
+    tokens (docs/19-marketplace-licensing.md, ADR-036) as PASETO v4.public (Ed25519). A dedicated
+    library, mirroring WireHQ.Identity's role for auth crypto: a small, high-scrutiny surface kept
+    apart from Infrastructure. Implements the Application licensing ports; reuses the codebase's
+    existing libsodium binding (NSec) rather than adding a second crypto stack.
+
+    Ships to the Community Edition dormant and secret-free: it contains no keys (they arrive from
+    configuration at runtime) and the CE will use only the VERIFIER half offline in a later wave. The
+    security rests entirely on the Ed25519 private key, never on this code being private.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>WireHQ.Licensing</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WireHQ.Application\WireHQ.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NSec.Cryptography" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+  </ItemGroup>
+
+</Project>

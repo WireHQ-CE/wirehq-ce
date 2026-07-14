@@ -1,0 +1,315 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (build + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      # Advisory: surfaces NuGet advisories (NU19xx) without failing the build — they're
+      # triaged via Dependabot / continuous review, not by breaking every PR (see
+      # Directory.Build.props). Use the report to prioritise upgrades.
+      - name: Dependency vulnerability audit (advisory)
+        continue-on-error: true
+        run: dotnet list package --vulnerable --include-transitive
+
+      # Directory.Build.props sets TreatWarningsAsErrors — a warning fails the build.
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      # Unit tests run anywhere; integration tests use Testcontainers (Docker is available
+      # on ubuntu runners) to exercise the real pipeline against a disposable Postgres.
+      - name: Test
+        run: dotnet test --configuration Release --no-build --verbosity normal
+
+  frontend:
+    name: Frontend (typecheck + lint + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm install
+
+      - name: Dependency vulnerability audit (advisory)
+        continue-on-error: true
+        run: npm audit --audit-level=high
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+  agent:
+    name: Agent (Go build + vet + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.23'
+          cache: false # standard library only — no modules to cache
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      # Advisory Go security linter for the agent. Non-blocking for now; promote to a hard
+      # gate after the Phase 3 audit triages any baseline findings.
+      - name: gosec (advisory)
+        continue-on-error: true
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          "$(go env GOPATH)/bin/gosec" ./...
+
+      - name: Cross-compile (linux amd64/arm64)
+        run: |
+          GOOS=linux GOARCH=amd64 go build -o /tmp/wirehq-agent-amd64 .
+          GOOS=linux GOARCH=arm64 go build -o /tmp/wirehq-agent-arm64 .
+
+  version-coherence:
+    name: Version coherence (VersionPrefix == web)
+    runs-on: ubuntu-latest
+    # The api reports its version from <VersionPrefix> and the web bundle from web/package.json; the CE update
+    # check + the release tag all depend on these agreeing (docs/30 U-5 / I2). Keep the two source files in sync
+    # on every PR here; the stricter tag == VersionPrefix == web check runs at release time in release.yml.
+    steps:
+      - uses: actions/checkout@v7
+      - name: Assert VersionPrefix == web/package.json
+        run: |
+          set -euo pipefail
+          prefix="$(grep -oE '<VersionPrefix>[^<]+' Directory.Build.props | sed 's/<VersionPrefix>//')"
+          web="$(jq -r .version web/package.json)"
+          echo "VersionPrefix=$prefix  web/package.json=$web"
+          if [ "$prefix" != "$web" ]; then
+            echo "::error::Directory.Build.props <VersionPrefix> ($prefix) must equal web/package.json ($web) — bump them together."
+            exit 1
+          fi
+          echo "✓ coherent"
+
+  ce-generation:
+    name: Community Edition (generation guard)
+    runs-on: ubuntu-latest
+    # The CE guard (docs/17 §4–§5): keeps the *generated* Community Edition green on every change.
+    # Runs the full strip pipeline — forbidden markers, the feature allow-list ("always prompted"),
+    # gitleaks, and a build of the generated tree (the entanglement detector) — so a PR that welds
+    # SaaS code into the core, or adds a feature area nobody classified, fails HERE instead of at
+    # the next manual generation. Docs-only PRs are skipped by the path gate; pushes to main always
+    # verify (main is the CE's artifact source). Self-skips in the generated CE tree itself (no ce/).
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Gate — does this change affect the generated CE?
+        id: gate
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ ! -f scripts/generate-ce.sh ] || [ ! -d ce ]; then
+            echo "No CE pipeline in this tree (this is the generated CE) — skipping."
+            echo "run=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "Push to main — always verify the CE generation."
+            echo "run=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          echo "Changed files in this PR:"; echo "$changed"; echo
+          if echo "$changed" | grep -qE '^(src/|web/|agent/|deploy/|ce/|scripts/|\.github/|Directory\.(Build|Packages)\.props|global\.json)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No CE-relevant paths touched — generation not required."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup .NET
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Setup Node
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Generate + verify the Community Edition
+        if: steps.gate.outputs.run == 'true'
+        run: ./scripts/generate-ce.sh "$RUNNER_TEMP/wirehq-ce"
+
+  docs-sync:
+    name: Docs sync
+    runs-on: ubuntu-latest
+    # Only on PRs (needs a base to diff), and skippable for the rare genuinely doc-exempt code PR via a
+    # 'skip-docs-sync' label. Keeps the living docs (CHANGELOG + HANDOFF) from drifting behind fast-paced
+    # code changes — the drift this guards against actually happened (handoff sat nine PRs stale). See
+    # docs/GIT.md §5.
+    if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-docs-sync')
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Require CHANGELOG + HANDOFF when code changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # Self-skip in the generated Community Edition: it ships this workflow (it's the CE's own CI) but
+          # deliberately strips the living docs (CHANGELOG.md + docs/HANDOFF.md). Without this guard every
+          # public code PR on the CE repo would fail here. Mirrors the ce-generation job's self-skip.
+          if [ ! -f CHANGELOG.md ] || [ ! -f docs/HANDOFF.md ]; then
+            echo "No living docs in this tree (generated CE) — docs sync not applicable."
+            exit 0
+          fi
+
+          changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          echo "Changed files in this PR:"; echo "$changed"; echo
+
+          # Only enforce when the PR actually touches application/runtime code.
+          if ! echo "$changed" | grep -qE '^(src/|web/src/)'; then
+            echo "No src/ or web/src/ changes — docs sync not required."
+            exit 0
+          fi
+
+          missing=""
+          echo "$changed" | grep -qx 'CHANGELOG.md'    || missing="$missing CHANGELOG.md"
+          echo "$changed" | grep -qx 'docs/HANDOFF.md' || missing="$missing docs/HANDOFF.md"
+
+          if [ -n "$missing" ]; then
+            echo "::error::This PR changes code but does not update:$missing"
+            echo "Update them (CHANGELOG '[Unreleased]' entry + HANDOFF §0 header / §15 catalogue — see"
+            echo "docs/GIT.md §5 Definition of Done), or add the 'skip-docs-sync' label if genuinely exempt."
+            exit 1
+          fi
+
+          echo "Docs sync satisfied: CHANGELOG.md and docs/HANDOFF.md were both updated."
+
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    # BLOCKING. Scans the working tree for committed secrets. Documented dev/test placeholders
+    # and build output are allowlisted in .gitleaks.toml, so a finding here is a REAL leak —
+    # rotate it, don't just delete it (docs/GIT.md §0.4). Mirrors the local pre-commit hook.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:latest \
+            dir /repo --config /repo/.gitleaks.toml --no-banner --redact
+
+  sast:
+    name: SAST (semgrep)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    # The active SAST while the repo is private (CodeQL needs paid GHAS — see the codeql job).
+    # BLOCKING: fails the PR on any ERROR-severity finding. The Phase 3 security audit triaged the
+    # baseline to zero (the two findings were verified false positives and suppressed in-code with
+    # justified `nosemgrep` comments — see docs/14-security-audit.md), so this now enforces.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Semgrep scan
+        run: |
+          semgrep scan \
+            --config p/default \
+            --config p/security-audit \
+            --config p/secrets \
+            --config p/csharp \
+            --config p/typescript \
+            --severity ERROR \
+            --error \
+            --metrics off
+
+  codeql:
+    name: CodeQL (SAST)
+    runs-on: ubuntu-latest
+    # CodeQL uploads to GitHub code scanning, which on a *private* repo requires GitHub Advanced
+    # Security (a paid feature). While private, the `sast` (semgrep) job above is the active SAST.
+    # This job is skipped (neutral, non-blocking) and AUTO-ACTIVATES if the repo ever goes public —
+    # at which point semgrep + CodeQL run side by side. (Enable GHAS to run CodeQL on private.)
+    if: github.event.repository.visibility == 'public'
+    permissions:
+      # Declaring `permissions` opts out of the default token scopes, so the private-repo
+      # checkout needs `contents: read` (without it: "repository not found"); `actions: read`
+      # is required by CodeQL on private repos.
+      security-events: write
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [csharp, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        if: matrix.language == 'csharp'
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          # NB: the input is plural (`languages`) — the singular form is silently undefined on v4
+          # and would fail this job the moment it activates on a public repo (e.g. the published CE).
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v4
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v4

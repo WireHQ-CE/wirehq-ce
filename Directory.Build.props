@@ -1,0 +1,37 @@
+<Project>
+
+  <!-- Applied to every project in the solution. Keeps build settings DRY and consistent. -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- Quality gates: compiler + nullable warnings fail the build from day one. Analyzer
+         (CAxxxx) rules stay at default severities here; teams can raise this to
+         'latest-recommended' once they want the broader analyzer set enforced as errors. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+
+    <!-- NuGet security audit stays ON (default), but advisories (NU19xx) are surfaced as
+         WARNINGS, not build-breaking errors. New advisories land on existing pinned versions
+         over time; they belong to continuous security review / Dependabot, not to failing
+         every restore. Review them with the "dotnet list package vulnerable" report. -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+
+    <!-- Deterministic, reproducible builds (good for supply-chain integrity). -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+
+    <!-- Org-wide metadata. VersionPrefix is the SemVer source for built assemblies; the release
+         pipeline tags images from the matching git tag (see docs/RELEASING.md). Bump both on release. -->
+    <VersionPrefix>0.85.0</VersionPrefix>
+    <Company>WireHQ</Company>
+    <Product>WireHQ</Product>
+    <Authors>WireHQ</Authors>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+</Project>

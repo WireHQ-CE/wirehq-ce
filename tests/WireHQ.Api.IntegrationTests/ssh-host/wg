@@ -1,0 +1,22 @@
+#!/bin/sh
+# Fake `wg` for WireHQ deploy + telemetry tests (no kernel module — ADR-002).
+#
+#   wg show <iface>          → any non-empty output (the deploy's verify step only checks exit 0)
+#   wg show <iface> dump     → a synthesized `wg show dump`, built FROM the deployed config so the peer
+#                              public keys match the real peers WireHQ created. Handshake/rx/tx are fixed
+#                              sentinels (1718200000 / 1024 / 2048) so the telemetry sync has real data.
+#
+# Dump format (tab-separated): interface line `priv pub listen-port fwmark`, then one peer line per peer
+# `pub psk endpoint allowed-ips latest-handshake rx tx keepalive`.
+if [ "$1" = "show" ] && [ "$3" = "dump" ]; then
+  conf="/etc/wireguard/$2.conf"
+  port=$(awk -F ' = ' '/^ListenPort/ { print $2 }' "$conf" 2>/dev/null)
+  printf 'SERVERPRIVKEY\tSERVERPUBKEY\t%s\toff\n' "${port:-0}"
+  awk '/^PublicKey/ { print $3 "\t(none)\t(none)\t10.0.0.0/32\t1718200000\t1024\t2048\toff" }' "$conf" 2>/dev/null
+  exit 0
+fi
+
+case "$1" in
+  show) echo "interface: $2" ;;
+esac
+exit 0

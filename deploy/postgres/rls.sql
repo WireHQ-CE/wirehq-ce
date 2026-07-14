@@ -1,0 +1,18 @@
+-- =============================================================================
+-- WireHQ — Row-Level Security (Layer 2 tenant isolation).  ADR-027.
+--
+-- NOTE: This is no longer the authoritative copy. The RLS policies are now
+-- generated **data-driven** (every table carrying organization_id) and applied
+-- AUTOMATICALLY on boot by ApplicationDbContextInitializer, from the embedded
+-- script:
+--
+--     src/WireHQ.Infrastructure/Persistence/Rls/rls.sql
+--
+-- Edit that file — it is the single source of truth and runs after every migration,
+-- so new tenant tables are covered automatically (no hand-maintained list to forget,
+-- which is what left this copy stale at 4 of 16 tables).
+--
+-- This stub remains only as a pointer for operators / runbooks
+-- (docs/03-multi-tenancy.md, docs/10-deployment.md). To apply manually, run the
+-- embedded script above against the database as the table owner, after migrations.
+-- =============================================================================

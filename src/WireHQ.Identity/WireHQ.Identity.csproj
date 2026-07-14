@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Security adapters. Implements the Application auth ports: JWT issuance, password hashing,
+    TOTP/MFA, recovery codes, secret protection. Kept separate from Infrastructure because
+    security is a distinct, high-scrutiny surface that will grow (SSO/SCIM/passkeys).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>WireHQ.Identity</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WireHQ.Application\WireHQ.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <!-- PBKDF2 for verifying legacy hashes; NSec/libsodium for Argon2id (current). -->
+    <PackageReference Include="Microsoft.AspNetCore.Cryptography.KeyDerivation" />
+    <PackageReference Include="NSec.Cryptography" />
+    <PackageReference Include="Otp.NET" />
+    <PackageReference Include="QRCoder" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+  </ItemGroup>
+
+</Project>

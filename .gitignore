@@ -1,0 +1,47 @@
+# ---- .NET ----
+bin/
+obj/
+out/
+*.user
+*.suo
+.vs/
+artifacts/
+TestResults/
+coverage/
+*.coverage
+*.trx
+
+# ---- Rider / Resharper ----
+.idea/
+_ReSharper*/
+*.DotSettings.user
+
+# ---- Claude Code (local agent config + preview launch.json) ----
+.claude/
+
+# ---- Node / Vite ----
+node_modules/
+web/dist/
+web/.vite/
+*.local
+.eslintcache
+
+# ---- Environment & secrets ----
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+secrets.json
+*.pem
+*.key
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+
+# ---- Docker ----
+.docker/data/
+
+# ---- Logs ----
+logs/
+*.log

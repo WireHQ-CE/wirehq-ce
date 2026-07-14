@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+#
+# pre-commit — stop secrets and junk from entering the repo (docs/GIT.md §0.4).
+#
+#   1. gitleaks (if installed) scans the staged changes; otherwise a high-confidence
+#      built-in regex fallback runs so the hook still protects a fresh machine.
+#   2. Blocks staging real secret files (.env, *.pem, *.key) even though they're gitignored.
+#   3. Blocks accidentally-staged large blobs (>2 MB).
+#
+# Bypass in a real emergency with:  git commit --no-verify  (then rotate anything exposed).
+
+set -euo pipefail
+
+red() { printf '\033[31m%s\033[0m\n' "$1" >&2; }
+
+staged="$(git diff --cached --name-only --diff-filter=ACM)"
+[[ -z "$staged" ]] && exit 0
+
+fail=0
+
+# 1) Forbidden secret-bearing files (defense in depth vs .gitignore).
+while IFS= read -r f; do
+  [[ -z "$f" ]] && continue
+  case "$f" in
+    .env|*/.env|.env.*|*/.env.*)
+      [[ "$f" == *.env.example || "$f" == *.example ]] && continue
+      red "✖ Refusing to commit env file: $f"; fail=1 ;;
+    *.pem|*.key|*.pfx|*.p12|id_rsa|id_ed25519)
+      red "✖ Refusing to commit key material: $f"; fail=1 ;;
+  esac
+done <<< "$staged"
+
+# 2) Large blobs.
+while IFS= read -r f; do
+  [[ -z "$f" || ! -f "$f" ]] && continue
+  size=$(wc -c < "$f" | tr -d ' ')
+  if [[ "$size" -gt 2097152 ]]; then
+    red "✖ $f is $((size/1024)) KB (>2 MB). Use external storage, not git."; fail=1
+  fi
+done <<< "$staged"
+
+# 3) Secret scan of the staged diff.
+if command -v gitleaks >/dev/null 2>&1; then
+  cfg=""; [[ -f .gitleaks.toml ]] && cfg="--config .gitleaks.toml"
+  # `protect --staged` works across gitleaks 8.x; fall back to `git --staged` for newer builds.
+  if ! gitleaks protect --staged --no-banner $cfg >/dev/null 2>&1; then
+    if ! gitleaks git --staged --no-banner $cfg >/dev/null 2>&1; then
+      red "✖ gitleaks found a potential secret in the staged changes. Review above / rotate it."
+      gitleaks protect --staged --no-banner --redact $cfg 2>/dev/null || true
+      fail=1
+    fi
+  fi
+else
+  # Built-in fallback: high-confidence patterns only (keeps false positives near zero).
+  diff="$(git diff --cached -U0)"
+  patterns=(
+    '-----BEGIN[A-Z ]*PRIVATE KEY-----'
+    'AKIA[0-9A-Z]{16}'
+    '\bsk_live_[0-9a-zA-Z]{16,}'
+    '\brk_live_[0-9a-zA-Z]{16,}'
+    'gh[pousr]_[0-9A-Za-z]{36,}'
+    'xox[baprs]-[0-9A-Za-z-]{10,}'
+  )
+  for p in "${patterns[@]}"; do
+    if printf '%s' "$diff" | grep -nE "$p" >/dev/null 2>&1; then
+      red "✖ Possible secret matching /$p/ in staged changes."
+      fail=1
+    fi
+  done
+  [[ "$fail" -eq 0 ]] || red "  (Install gitleaks for thorough scanning: brew install gitleaks)"
+fi
+
+if [[ "$fail" -ne 0 ]]; then
+  red "Commit blocked. Fix the above, or --no-verify in a genuine emergency (then rotate secrets)."
+  exit 1
+fi
+exit 0

@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+#
+# pre-push — the *fast* gate that keeps `main` (and every branch) green (docs/GIT.md §0/§5).
+#
+# Runs build + typecheck + lint locally before code leaves the machine. The full unit +
+# Testcontainers integration suites stay in CI (too slow for every push). Each step is skipped
+# with a warning if its toolchain isn't installed, so the hook is portable.
+#
+# Skips entirely on a branch *delete*. Escape hatches (use sparingly — CI still runs):
+#   git push --no-verify           one-off bypass
+#   WIREHQ_SKIP_PREPUSH=1 git push skip the whole hook
+#   WIREHQ_PREPUSH_SKIP_DOTNET=1   skip only the (slow) dotnet build
+
+set -uo pipefail
+
+[[ "${WIREHQ_SKIP_PREPUSH:-0}" == "1" ]] && { echo "pre-push skipped (WIREHQ_SKIP_PREPUSH=1)."; exit 0; }
+
+# Detect a pure delete push (all local SHAs are zero) — nothing to build.
+zero="0000000000000000000000000000000000000000"
+only_deletes=1
+while read -r _localref localsha _remoteref _remotesha; do
+  [[ -z "${localsha:-}" ]] && continue
+  [[ "$localsha" != "$zero" ]] && only_deletes=0
+done
+[[ "$only_deletes" == "1" ]] && exit 0
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+fail=0
+red()  { printf '\033[31m%s\033[0m\n' "$1" >&2; }
+note() { printf '\033[33m%s\033[0m\n' "$1" >&2; }
+ok()   { printf '\033[32m%s\033[0m\n' "$1"; }
+
+run() { # run "<label>" <cmd...>
+  local label="$1"; shift
+  echo "→ $label"
+  if "$@"; then ok "  ✓ $label"; else red "  ✗ $label failed"; fail=1; fi
+}
+
+# Backend: warnings-as-errors build (Debug, no tests — those run in CI).
+if [[ "${WIREHQ_PREPUSH_SKIP_DOTNET:-0}" == "1" ]]; then
+  note "Skipping dotnet build (WIREHQ_PREPUSH_SKIP_DOTNET=1)."
+elif command -v dotnet >/dev/null 2>&1; then
+  run "dotnet build" dotnet build --nologo -v minimal
+else
+  note "dotnet not found — skipping backend build."
+fi
+
+# Frontend: typecheck + lint + build.
+if command -v npm >/dev/null 2>&1; then
+  run "web typecheck" npm --prefix web run typecheck
+  run "web lint"      npm --prefix web run lint
+  run "web build"     npm --prefix web run build
+else
+  note "npm not found — skipping frontend checks."
+fi
+
+# Agent: vet + build (standard library only, fast).
+if command -v go >/dev/null 2>&1; then
+  run "go vet"   go -C agent vet ./...
+  run "go build" go -C agent build ./...
+else
+  note "go not found — skipping agent checks."
+fi
+
+if [[ "$fail" -ne 0 ]]; then
+  red "Push blocked — fix the failures above. Emergency bypass: git push --no-verify."
+  exit 1
+fi
+ok "pre-push checks passed."
+exit 0

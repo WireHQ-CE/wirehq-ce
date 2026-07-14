@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\WireHQ.Api\WireHQ.Api.csproj" />
+    <!-- Direct reference so provider/SSH unit tests can use the module's types. -->
+    <ProjectReference Include="..\..\src\WireHQ.Modules\WireHQ.Modules.Orchestration\WireHQ.Modules.Orchestration.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Copy the SSH + agent test-host build contexts to the output dir so the live deploy tests find them
+         via AppContext.BaseDirectory — robust under CI's deterministic (path-mapped) builds. The agent
+         context's Go source is grafted in at test time (the repo's agent/ dir, located via the sln root). -->
+    <None Include="ssh-host\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="agent-host\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

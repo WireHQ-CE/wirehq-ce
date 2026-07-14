@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Shared kernel. Zero external dependencies on purpose: it must be safe for every
+    other layer (including Domain) to reference. If it ever needs a package, that's a
+    signal the type belongs in a different layer.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>WireHQ.Shared</RootNamespace>
+  </PropertyGroup>
+
+</Project>

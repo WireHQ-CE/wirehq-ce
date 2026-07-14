@@ -1,0 +1,163 @@
+name: wirehq-ce
+
+# WireHQ Community Edition — the self-hosted stack, built from this repo's source.
+#
+#   1. ./deploy/setup.sh          # generates deploy/.env (secrets + defaults) and offers to start
+#   2. open the URL it prints — the IN-BROWSER setup wizard greets you: create the owner account
+#      there and you land signed-in on the dashboard
+#
+# (Start it yourself any time with `docker compose -f deploy/docker-compose.yml up -d --build`.)
+#
+# Production posture: migrations + seeding run in a discrete, run-once `migrate` job the API waits
+# for (the API never migrates itself outside Development); the API and Postgres ports are NOT
+# published — only the web (nginx) port, which proxies /api to the API internally. Registration
+# ships INVITE-ONLY (OPEN_REGISTRATION=false): add users via Users → Invite (requires SMTP), or set
+# OPEN_REGISTRATION=true while you onboard your team.
+
+x-app-env: &app-env
+  ASPNETCORE_ENVIRONMENT: Production
+  ASPNETCORE_HTTP_PORTS: "8080"
+  # Runtime app connection: the non-privileged, RLS-subject wirehq_app role. Its password is synced
+  # from this string by the migrate job (which runs on the Admin/owner connection).
+  ConnectionStrings__Default: "Host=db;Port=5432;Database=wirehq;Username=wirehq_app;Password=${WIREHQ_APP_PASSWORD:?run ./deploy/setup.sh first}"
+  # Owner/migrator connection: applies migrations + the row-level-security script + creates wirehq_app.
+  ConnectionStrings__Admin: "Host=db;Port=5432;Database=wirehq;Username=wirehq;Password=${POSTGRES_PASSWORD:?run ./deploy/setup.sh first}"
+  Jwt__SigningKey: "${JWT_SIGNING_KEY:?run ./deploy/setup.sh first}"
+  SecretProtection__Key: "${SECRET_PROTECTION_KEY:?run ./deploy/setup.sh first}"
+  # Used for links in email (invites / password reset) and CORS. Set to the URL your users browse to.
+  App__BaseUrl: "${APP_BASE_URL:-http://localhost:8080}"
+  Cors__AllowedOrigins__0: "${APP_BASE_URL:-http://localhost:8080}"
+  # First-run: the IN-BROWSER setup wizard (the default path). A fresh, ownerless instance sends its
+  # first visitor to /setup to create the owner account; the endpoint locks itself the moment any
+  # user exists.
+  Setup__Enabled: "true"
+  # Unattended alternative: set OWNER_EMAIL + OWNER_PASSWORD in deploy/.env and the owner is seeded
+  # at boot instead (idempotent — safe to leave set; the wizard then never appears).
+  Seed__OwnerEmail: "${OWNER_EMAIL:-}"
+  Seed__OwnerPassword: "${OWNER_PASSWORD:-}"
+  Seed__OwnerName: "${OWNER_NAME:-Owner}"
+  Seed__OrganizationName: "${ORGANIZATION_NAME:-WireHQ}"
+  # Invite-only by default: self-serve signup is closed; the owner invites users (needs SMTP below).
+  Auth__OpenRegistration: "${OPEN_REGISTRATION:-false}"
+  # The Community Edition provisions orgs on the LEAN free core (docs/29): WireGuard core + SSH/agent deploy +
+  # users + audit-read are free and uncapped; premium capabilities unlock à la carte by activating purchased
+  # Marketplace module licences (Settings → Modules). New orgs get this automatically.
+  Entitlements__DefaultEdition: "CommunityEdition"
+  # One-shot, OPT-IN re-edition of an UPGRADING install's existing orgs from the old uncapped-Enterprise default
+  # to the lean CommunityEdition (docs/29 M-15). This is FEATURE-REMOVING — an org's previously-free premium
+  # capabilities then need an activated module licence — so it is off by default and announced in the release
+  # notes. Set REEDITION_EXISTING_ORGS=true in deploy/.env once, redeploy (the migrate job applies it), then you
+  # may unset it. A fresh install needs nothing here (new orgs are already CommunityEdition).
+  Entitlements__ReeditionExistingOrgs: "${REEDITION_EXISTING_ORGS:-false}"
+  # Community Edition branding: transactional email carries the edition tagline under the wordmark
+  # (the web UI's tagline is baked in at build time via web/.env — docs/17 §6).
+  Branding__EditionTagline: "Community Edition"
+  # ── CE Marketplace module licensing (docs/29 Wave 3, M-18) ─────────────────────────────────────────
+  # To activate purchased Marketplace modules, the install VERIFIES WireHQ-signed activation tokens against
+  # WireHQ's PUBLIC licensing key (verify-only — the Community Edition never signs). WireHQ's real key id +
+  # public key are baked in below as the defaults, so activation works out of the box; override via deploy/.env
+  # only for a private/self-issued Marketplace. A missing/invalid key ring never faults the control plane — the
+  # Modules console would just report "activation unavailable". The call-home target defaults to the hosted service.
+  Licensing__ActiveKeyId: "${LICENSING_KEY_ID:-lk-20260711-3c46c4}"
+  Licensing__Keys__0__Kid: "${LICENSING_KEY_ID:-lk-20260711-3c46c4}"
+  Licensing__Keys__0__PublicKey: "${LICENSING_PUBLIC_KEY:-PNzruVsKbernoalgYPWmMLB6rANYjjmnbp0TdTnvvIw=}"
+  Modules__LicensingBaseUrl: "${LICENSING_BASE_URL:-https://licensing.wirehq.net}"
+  # ── In-app update notifications (docs/30) ──────────────────────────────────────────────────────────
+  # ⓘ PRIVACY: when enabled (the default), this install makes an ANONYMOUS daily GET to the manifest URL
+  # below to learn if a newer — especially security — WireHQ release exists. It sends NO identifiers (no
+  # fingerprint, no version, no account) — it only downloads a signed document and compares versions
+  # locally. Set UPDATES_ENABLED=false in deploy/.env to disable it entirely (e.g. an air-gapped install).
+  # The manifest is signature-verified against Updates__PublicKey — WireHQ's published update key, baked in
+  # below as the default. Until WireHQ publishes a signed manifest at the URL, this simply shows nothing.
+  Updates__Enabled: "${UPDATES_ENABLED:-true}"
+  Updates__ManifestUrl: "${UPDATES_MANIFEST_URL:-https://updates.wirehq.net/ce/latest}"
+  Updates__PublicKey: "${UPDATES_PUBLIC_KEY:-QpuQunnFU6cn/pt6o45E1/k47gpUyBY1L0kMFbVdfkw=}"
+  Updates__CheckIntervalHours: "${UPDATES_CHECK_INTERVAL_HOURS:-24}"
+  # The "Release notes" link in the update modal is CONSTRUCTED (never from the manifest) as
+  # <base><version>. Leave blank to use the built-in default (the public CE repo's release tags); override
+  # only if your CE releases live elsewhere. Must end so that appending "X.Y.Z" yields a valid URL.
+  Updates__ReleaseNotesBaseUrl: "${UPDATES_RELEASE_NOTES_BASE_URL:-}"
+  # The in-app API reference (Swagger UI + the OpenAPI JSON endpoint) is not shipped in the CE — the full
+  # source is right here, so read the code or hit the routes directly. Keep the spec endpoint off too.
+  OpenApi__Enabled: "false"
+  # SMTP — optional, but invites and password-reset email need it. This .env is the ONLY SMTP
+  # interface in the CE (no platform Settings UI), so SyncFromConfig re-applies these values on
+  # every boot — edit .env, `docker compose up -d`, done.
+  Smtp__SyncFromConfig: "true"
+  Smtp__Enabled: "${SMTP_ENABLED:-false}"
+  Smtp__Host: "${SMTP_HOST:-}"
+  Smtp__Port: "${SMTP_PORT:-587}"
+  Smtp__UseSsl: "${SMTP_USE_SSL:-false}"
+  Smtp__Username: "${SMTP_USERNAME:-}"
+  Smtp__Password: "${SMTP_PASSWORD:-}"
+  Smtp__FromEmail: "${SMTP_FROM_EMAIL:-no-reply@wirehq.local}"
+  Smtp__FromName: "${SMTP_FROM_NAME:-WireHQ}"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: wirehq
+      POSTGRES_USER: wirehq
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run ./deploy/setup.sh first}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # NOT published — the DB is reachable only inside the compose network. Back up with
+    # deploy/backup-db.sh (docker compose exec), never over a public port.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wirehq -d wirehq"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  # Run-once migrations gate: applies the schema + row-level security + seeds reference data and the
+  # first Owner, then exits 0. The API waits for it to complete successfully.
+  migrate:
+    build:
+      context: ..
+      dockerfile: deploy/api.Dockerfile
+    image: wirehq-ce-api:local
+    command: ["dotnet", "WireHQ.Api.dll", "--migrate"]
+    restart: "no"
+    environment: *app-env
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/api.Dockerfile
+    image: wirehq-ce-api:local
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      # The outbound-agent mTLS gateway (for the WireHQ Gateway container / remote agents). Off by
+      # default; deploy/docker-compose.gateway.yml enables it and publishes its port.
+      AgentGateway__Enabled: "${AGENT_GATEWAY_ENABLED:-false}"
+      AgentGateway__Port: "${AGENT_GATEWAY_PORT:-28443}"
+      AgentGateway__ServerCertificatePath: "${AGENT_GATEWAY_CERT_PATH:-}"
+    # NO published API port: the API is reached only via the web container's nginx (api:8080), so
+    # forwarded headers can be trusted. Don't publish 8080.
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+    image: wirehq-ce-web:local
+    restart: unless-stopped
+    # The only published port. Default binds all interfaces for LAN access over plain HTTP; put your
+    # own TLS proxy in front (and set WEB_BIND=127.0.0.1) if you expose it beyond your network.
+    ports:
+      - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-8080}:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

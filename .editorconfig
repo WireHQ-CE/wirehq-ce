@@ -1,0 +1,47 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{js,jsx,ts,tsx,json,css,scss,html,yml,yaml}]
+indent_size = 2
+
+[*.{md,markdown}]
+trim_trailing_whitespace = false
+
+[*.cs]
+# Namespaces
+csharp_style_namespace_declarations = file_scoped:warning
+
+# var usage
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+
+# Expression-bodied members
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+
+# this. preferences
+dotnet_style_qualification_for_field = false:warning
+dotnet_style_qualification_for_property = false:warning
+
+# Modifiers
+dotnet_style_require_accessibility_modifiers = always:warning
+csharp_preferred_modifier_order = public,private,protected,internal,static,extern,new,virtual,abstract,sealed,override,readonly,unsafe,volatile,async:suggestion
+
+# Nullable & quality
+dotnet_diagnostic.CA1062.severity = none
+dotnet_diagnostic.IDE0058.severity = none
+
+# Naming: interfaces start with I, private fields _camelCase
+dotnet_naming_rule.private_fields_underscore.severity = warning
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_prefix
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_prefix.capitalization = camel_case
+dotnet_naming_style.underscore_prefix.required_prefix = _

@@ -1,0 +1,13 @@
+# WireHQ — https://wirehq.net
+# Public marketing/legal pages are crawlable; the authenticated app, API and auth pages are not.
+User-agent: *
+Allow: /
+Disallow: /app
+Disallow: /api
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+
+Sitemap: https://wirehq.net/sitemap.xml

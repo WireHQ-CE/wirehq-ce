@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The module contract. Feature modules (WireGuard, Devices, Gateways, …) implement IModule and
+    are discovered + gated + wired by the host with no host code changes. FrameworkReference gives
+    access to ASP.NET routing/DI types without a heavy package dependency.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>WireHQ.Modules.Abstractions</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

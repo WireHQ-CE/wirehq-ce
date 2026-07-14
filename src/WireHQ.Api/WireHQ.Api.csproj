@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    The host & composition root — the only project that references Infrastructure, Identity, and
+    the module abstractions. Builds the HTTP pipeline and wires everything together.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>WireHQ.Api</RootNamespace>
+    <UserSecretsId>wirehq-api</UserSecretsId>
+    <!-- The XML doc file feeds the generated OpenAPI reference (docs/27); CS1591 is NoWarn'd repo-wide. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WireHQ.Application\WireHQ.Application.csproj" />
+    <ProjectReference Include="..\WireHQ.Infrastructure\WireHQ.Infrastructure.csproj" />
+    <ProjectReference Include="..\WireHQ.Identity\WireHQ.Identity.csproj" />
+    <ProjectReference Include="..\WireHQ.Licensing\WireHQ.Licensing.csproj" />
+    <ProjectReference Include="..\WireHQ.Modules\WireHQ.Modules.Abstractions\WireHQ.Modules.Abstractions.csproj" />
+    <ProjectReference Include="..\WireHQ.Modules\WireHQ.Modules.WireGuard\WireHQ.Modules.WireGuard.csproj" />
+    <ProjectReference Include="..\WireHQ.Modules\WireHQ.Modules.Orchestration\WireHQ.Modules.Orchestration.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.OpenTelemetry" />
+    <PackageReference Include="Serilog.Enrichers.Environment" />
+    <PackageReference Include="Serilog.Enrichers.Span" />
+    <PackageReference Include="Asp.Versioning.Mvc" />
+    <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
+  </ItemGroup>
+
+</Project>

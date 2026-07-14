@@ -1,0 +1,34 @@
+# gitleaks configuration for WireHQ.
+#
+# Extends gitleaks' built-in ruleset and adds a tight allowlist for *documented dev/test
+# placeholders* and build output, so the CI secret-scan (and the pre-commit hook) stay
+# blocking for REAL secrets without false-positiving on intentional non-secrets.
+# Every allowlisted value below is a well-known dev default — see deploy/.env.example,
+# src/WireHQ.Api/appsettings.Development.json and docs/10-deployment.md. Production injects
+# real secrets via the environment; none of them live in git.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "WireHQ dev/test placeholders and generated build artifacts (not real secrets)"
+
+# Never scan build output or vendored deps (present in a dev tree; absent in a clean CI checkout).
+paths = [
+  '''(^|/)bin/''',
+  '''(^|/)obj/''',
+  '''(^|/)dist/''',
+  '''(^|/)node_modules/''',
+  '''\.gitleaks\.toml$''',
+]
+
+# High-confidence allowlist of the exact dev-only placeholder values.
+regexes = [
+  # Dev-only AES key placeholder (base64 of "dev-only-32-byte-aes-key-change!").
+  '''ZGV2LW9ubHktMzItYnl0ZS1hZXMta2V5LWNoYW5nZSE=''',
+  # Dev-only JWT signing key placeholder.
+  '''dev-only-insecure-signing-key-change-me-please-32\+bytes''',
+  # Hardcoded integration-test fixture credentials.
+  '''Globex-Sup3r-Pass''',
+  '''WireHQ-Demo-123''',
+]

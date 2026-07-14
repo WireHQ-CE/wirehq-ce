@@ -1,0 +1,101 @@
+<Project>
+
+  <!--
+    Central Package Management (CPM).
+    Every package version is declared ONCE here. Projects reference packages by name
+    only (no Version attribute). This eliminates version drift across projects — a
+    common source of technical debt in multi-project solutions.
+  -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup Label="Application / CQRS">
+    <PackageVersion Include="MediatR" Version="12.5.0" />
+    <PackageVersion Include="FluentValidation" Version="11.12.0" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="11.12.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Persistence / EF Core">
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.2" />
+    <PackageVersion Include="EFCore.NamingConventions" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Identity / Security">
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.17" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="9.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Cryptography.KeyDerivation" Version="9.0.17" />
+    <PackageVersion Include="Otp.NET" Version="1.4.1" />
+    <PackageVersion Include="QRCoder" Version="1.8.0" />
+    <PackageVersion Include="NSec.Cryptography" Version="26.4.0" />
+    <PackageVersion Include="DnsClient" Version="1.8.0" />
+    <PackageVersion Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.14.0" />
+    <PackageVersion Include="ITfoxtec.Identity.Saml2" Version="4.20.1" />
+    <PackageVersion Include="Novell.Directory.Ldap.NETStandard" Version="3.6.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="WireGuard module">
+    <PackageVersion Include="CsvHelper" Version="33.1.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Orchestration module">
+    <PackageVersion Include="SSH.NET" Version="2025.1.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="API">
+    <PackageVersion Include="Asp.Versioning.Mvc" Version="8.1.1" />
+    <PackageVersion Include="Asp.Versioning.Mvc.ApiExplorer" Version="8.1.1" />
+    <PackageVersion Include="Swashbuckle.AspNetCore" Version="7.3.2" />
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="9.0.17" />
+  </ItemGroup>
+
+  <ItemGroup Label="Observability">
+    <PackageVersion Include="Serilog.AspNetCore" Version="9.0.0" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageVersion Include="Serilog.Sinks.OpenTelemetry" Version="4.1.1" />
+    <PackageVersion Include="Serilog.Enrichers.Environment" Version="3.0.1" />
+    <PackageVersion Include="Serilog.Enrichers.Span" Version="3.1.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.16.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.16.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.12.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.16.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Framework extensions (abstractions)">
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.17" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.17" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.17" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="9.0.17" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="9.0.17" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="9.0.8" />
+  </ItemGroup>
+
+  <ItemGroup Label="Resilience / Infrastructure">
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Email">
+    <PackageVersion Include="MailKit" Version="4.17.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Billing">
+    <PackageVersion Include="Stripe.net" Version="52.1.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Testing">
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="FluentAssertions" Version="6.12.2" />
+    <PackageVersion Include="NSubstitute" Version="5.3.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.1.0" />
+  </ItemGroup>
+
+</Project>
