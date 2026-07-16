@@ -198,27 +198,57 @@ public sealed class ApplicationDbContextInitializer(
     {
         const int maxAttempts = 12;
         var delay = TimeSpan.FromSeconds(3);
+        Exception? lastError = null;
 
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
             try
             {
-                if (await context.Database.CanConnectAsync(cancellationToken))
-                {
-                    return;
-                }
-
-                logger.LogWarning("Database not ready yet (attempt {Attempt}/{Max}).", attempt, maxAttempts);
+                // Open a REAL connection rather than CanConnectAsync — the latter swallows the exception and returns a
+                // bare false, which is exactly why a wrong password used to surface as a useless "not reachable". A
+                // successful open+close proves the DB is up AND the credentials are accepted.
+                await context.Database.OpenConnectionAsync(cancellationToken);
+                await context.Database.CloseConnectionAsync();
+                return;
             }
-            catch (Exception ex) when (attempt < maxAttempts)
+            catch (Exception ex)
             {
+                lastError = ex;
                 logger.LogWarning("Waiting for database (attempt {Attempt}/{Max}): {Error}", attempt, maxAttempts, ex.Message);
             }
 
             await Task.Delay(delay, cancellationToken);
         }
 
-        throw new InvalidOperationException($"Database was not reachable after {maxAttempts} attempts.");
+        // Persistent failure. If the server rejected our credentials, say so plainly and point at the usual cause: a
+        // pre-existing data volume from an earlier install. Postgres ignores POSTGRES_PASSWORD once its data directory
+        // exists, so a freshly-generated deploy/.env won't match the stored password. This turns a baffling 36-second
+        // timeout into a one-line diagnosis.
+        var message = IsAuthenticationFailure(lastError)
+            ? "Database authentication failed — the server rejected the configured credentials. This almost always means "
+              + "the Postgres data VOLUME was initialised by an EARLIER install with a different password (Postgres ignores "
+              + "POSTGRES_PASSWORD once its data directory exists, so freshly-generated secrets in deploy/.env won't match). "
+              + "Reset the volume and re-run — e.g. `docker compose -f deploy/docker-compose.yml down -v` then "
+              + "`./deploy/setup.sh` (this DELETES the local database). Underlying error: " + (lastError?.Message ?? "unknown")
+            : $"Database was not reachable after {maxAttempts} attempts. Last error: {lastError?.Message ?? "unknown"}.";
+
+        throw new InvalidOperationException(message, lastError);
+    }
+
+    /// <summary>A Postgres authentication/authorisation failure (SqlState 28P01 invalid_password / 28000
+    /// invalid_authorization_specification) anywhere in the exception chain — as distinct from a transient
+    /// connection-refused while the server is still coming up.</summary>
+    private static bool IsAuthenticationFailure(Exception? ex)
+    {
+        for (var e = ex; e is not null; e = e.InnerException)
+        {
+            if (e is Npgsql.PostgresException { SqlState: "28P01" or "28000" })
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)

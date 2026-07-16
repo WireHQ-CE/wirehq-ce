@@ -98,6 +98,19 @@ EOF
 chmod 600 "$env_file"
 ok "Wrote $env_file (permissions 600) with generated secrets."
 
+# A Postgres data volume left over from an earlier install still holds the password from when it was FIRST
+# created — Postgres ignores POSTGRES_PASSWORD once its data directory exists, so the fresh secrets just written
+# won't match it, and startup fails with a confusing authentication error. Warn proactively if we can see one.
+project="$(basename "$(cd "$here/.." && pwd)" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9_-')"
+if command -v docker >/dev/null 2>&1 && docker volume ls --format '{{.Name}}' 2>/dev/null | grep -qx "${project}_pgdata"; then
+  say ""
+  say "${bold}⚠ A database volume '${project}_pgdata' already exists from an earlier run.${reset}"
+  say "  Postgres keeps the password from when that volume was first created and ignores the fresh secrets just"
+  say "  written — so startup may fail with an authentication error. If it does, reset it (this DELETES that DB):"
+  say "    ${dim}docker compose -f deploy/docker-compose.yml down -v${reset}   then re-run ./deploy/setup.sh"
+  say ""
+fi
+
 started=0
 if [ -t 0 ] && command -v docker >/dev/null 2>&1; then
   printf '%s %s[Y/n]%s ' "Start WireHQ now (docker compose up -d --build; first build takes a few minutes)?" "$dim" "$reset"
