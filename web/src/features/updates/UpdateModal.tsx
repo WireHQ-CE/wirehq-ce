@@ -3,6 +3,7 @@ import { AlertTriangle, Copy, Check, ExternalLink, ShieldAlert } from 'lucide-re
 import { Dialog } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { EDITION } from '@/lib/edition';
 import type { UpdateStatus } from './api';
 
 function timeAgo(iso: string | null): string | null {
@@ -20,7 +21,14 @@ function timeAgo(iso: string | null): string | null {
  */
 export function UpdateModal({ status, onClose }: { status: UpdateStatus; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
-  const command = `./deploy/deploy.sh ${status.latestVersion}`;
+  // The upgrade command differs by edition (this modal only ever renders on the CE today, but stay honest for both):
+  // the self-hosted CE builds from its clone (`deploy/deploy.sh` + docker-compose.prod.yml are stripped from it, and
+  // it has no GHCR images to pull), while the SaaS/VPS operator rolls prebuilt images. Kept in sync with the CE
+  // README's "Updating" section. (docs/30 U-8 / docs/17)
+  const isCommunity = EDITION === 'community';
+  const command = isCommunity
+    ? 'git pull && docker compose -f deploy/docker-compose.yml up -d --build'
+    : `./deploy/deploy.sh ${status.latestVersion}`;
   const webVersion = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : null;
   const partialUpgrade = webVersion !== null && webVersion !== status.currentVersion;
   const checked = timeAgo(status.checkedAtUtc);
@@ -66,7 +74,9 @@ export function UpdateModal({ status, onClose }: { status: UpdateStatus; onClose
         )}
 
         <div>
-          <p className="mb-1 text-ink-500">Run this from the host with shell access:</p>
+          <p className="mb-1 text-ink-500">
+            {isCommunity ? 'From the folder where WireHQ is installed, run:' : 'Run this from the host with shell access:'}
+          </p>
           <div className="flex items-center justify-between gap-2 rounded-md bg-ink-900 px-3 py-2 font-mono text-xs text-ink-50">
             <code className="select-all">{command}</code>
             <button onClick={copy} className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-ink-300 hover:bg-ink-700" aria-label="Copy command">
@@ -74,7 +84,9 @@ export function UpdateModal({ status, onClose }: { status: UpdateStatus; onClose
             </button>
           </div>
           <p className="mt-1 text-xs text-ink-400">
-            This backs up, runs migrations, and rolls the images — WireHQ does not update itself.
+            {isCommunity
+              ? 'This rebuilds from the new source and applies any migrations via a one-shot job, preserving your data — WireHQ does not update itself.'
+              : 'This backs up, runs migrations, and rolls the images — WireHQ does not update itself.'}
           </p>
         </div>
 
