@@ -27,7 +27,7 @@
 
     <!-- Org-wide metadata. VersionPrefix is the SemVer source for built assemblies; the release
          pipeline tags images from the matching git tag (see docs/RELEASING.md). Bump both on release. -->
-    <VersionPrefix>0.89.0</VersionPrefix>
+    <VersionPrefix>0.90.0</VersionPrefix>
     <Company>WireHQ</Company>
     <Product>WireHQ</Product>
     <Authors>WireHQ</Authors>

@@ -61,6 +61,10 @@ public static class MarketplaceModuleCatalog
     // Chat Alerts (docs/35 Wave 2) first becomes activatable in the release that ships the notification Chat channel.
     private const string NotificationsBaseline = "0.80.0";
 
+    // Advanced Notifications (docs/35 Wave 3) first becomes activatable in the v0.90.0 candidate that ships advanced
+    // routing — a distinct, later baseline than Chat Alerts (do NOT reuse NotificationsBaseline).
+    private const string AdvancedNotificationsBaseline = "0.90.0";
+
     private static string Docs(string slug) => $"docs/marketplace/{slug}/README.md";
     private static string Changelog(string slug) => $"docs/marketplace/{slug}/CHANGELOG.md";
 
@@ -99,6 +103,11 @@ public static class MarketplaceModuleCatalog
         Manifest("teams-connector", "Chat Alerts (Teams & Slack)", "Notifications",
             "Route notification rules to a Microsoft Teams or Slack channel — one-off, incoming-webhook alerts on the events you choose.",
             ModuleTier.Enterprise, ModuleStatus.Available, ModuleDelivery.GateOnly, minCe: NotificationsBaseline),
+        // Copy advertises ONLY shipped highlights (multi-pattern + email-beyond-quota + digests) — quiet-hours/escalation
+        // land in later Wave-3 slices and must not be advertised before they exist (docs/35 B-8/N-14).
+        Manifest("advanced-notifications", "Advanced Notifications", "Notifications",
+            "Match several event patterns in a single notification rule, create email rules beyond the free-tier limit, coalesce events into daily or weekly digests, hold non-urgent alerts during quiet hours, and escalate to a backup channel or on-call role when no one acknowledges.",
+            ModuleTier.Pro, ModuleStatus.Available, ModuleDelivery.GateOnly, minCe: AdvancedNotificationsBaseline),
 
         // --- Code-delivered set: shown for display, NOT activatable until the Architecture-B module runtime + the
         //     AGPL review (docs/33 §12/MM-8). Status = ComingSoon; the activation endpoint refuses them. ---

@@ -43,6 +43,9 @@ public static class ModuleCatalog
         // Chat Alerts — Teams/Slack notification channel (docs/35 Wave 2), kept-core; a licence lights up the
         // notifications.chat gate so an operator can route events to a chat webhook.
         new("teams-connector", new HashSet<string> { PlanFeatures.NotificationsChat }, ModuleDelivery.GateOnly),
+        // Advanced Notifications — advanced routing (docs/35 Wave 3), kept-core; a licence lights up the
+        // notifications.routing gate. Slice A ships multi-pattern routing rules; later highlights follow.
+        new("advanced-notifications", new HashSet<string> { PlanFeatures.NotificationsRouting }, ModuleDelivery.GateOnly),
 
         // Code-delivered — capability code is STRIPPED from the CE, so these unlock nothing until the phase-4
         // modules/ runtime ships their code (+ the AGPL review). Defined so the catalogue can show them

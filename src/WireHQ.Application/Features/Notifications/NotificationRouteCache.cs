@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using WireHQ.Application.Abstractions;
 using WireHQ.Application.Abstractions.Persistence;
+using WireHQ.Domain.Notifications;
 using WireHQ.Domain.Webhooks;
 
 namespace WireHQ.Application.Features.Notifications;
@@ -26,6 +27,10 @@ public sealed class NotificationRouteCache(IServiceScopeFactory scopeFactory)
     private volatile IReadOnlyDictionary<Guid, IReadOnlyList<CachedRule>> _byOrg =
         new Dictionary<Guid, IReadOnlyList<CachedRule>>();
     private volatile bool _loaded;
+
+    /// <summary>A rule matched to an audit action: its id and the digest cadence to stamp on the captured job (so the
+    /// job can be routed to the immediate-expand or the digest-flush drain phase — docs/35 §4.5).</summary>
+    public readonly record struct MatchedRule(Guid RuleId, DigestCadence Cadence);
 
     public async Task EnsureLoadedAsync(CancellationToken cancellationToken)
     {
@@ -61,9 +66,9 @@ public sealed class NotificationRouteCache(IServiceScopeFactory scopeFactory)
         }
     }
 
-    /// <summary>Rule ids in the org whose pattern matches the audit action. Pure in-memory — no I/O. Returns nothing
-    /// for a denylisted (self-emitted) action, so dispatch can never self-trigger.</summary>
-    public IReadOnlyList<Guid> MatchingRules(Guid organizationId, string action)
+    /// <summary>Rules in the org whose pattern matches the audit action (with the cadence to stamp). Pure in-memory —
+    /// no I/O. Returns nothing for a denylisted (self-emitted) action, so dispatch can never self-trigger.</summary>
+    public IReadOnlyList<MatchedRule> MatchingRules(Guid organizationId, string action)
     {
         if (action.StartsWith(SelfActionPrefix, StringComparison.Ordinal))
         {
@@ -75,16 +80,19 @@ public sealed class NotificationRouteCache(IServiceScopeFactory scopeFactory)
             return [];
         }
 
-        List<Guid>? matches = null;
+        // A multi-pattern (advanced) rule appears once per pattern in the cache, so an action matching >1 of its globs
+        // must still yield exactly ONE job for that rule — dedup rule ids with a seen-set (no duplicate jobs per event).
+        HashSet<Guid>? seen = null;
+        List<MatchedRule>? matches = null;
         foreach (var rule in rules)
         {
-            if (WebhookEventMatcher.Matches(rule.Pattern, action))
+            if (WebhookEventMatcher.Matches(rule.Pattern, action) && (seen ??= []).Add(rule.RuleId))
             {
-                (matches ??= []).Add(rule.RuleId);
+                (matches ??= []).Add(new MatchedRule(rule.RuleId, rule.Cadence));
             }
         }
 
-        return matches ?? (IReadOnlyList<Guid>)[];
+        return matches ?? (IReadOnlyList<MatchedRule>)[];
     }
 
     private async Task LoadAsync(CancellationToken cancellationToken)
@@ -93,19 +101,24 @@ public sealed class NotificationRouteCache(IServiceScopeFactory scopeFactory)
         scope.ServiceProvider.GetRequiredService<ISettableTenantContext>().SetBypass();
         var dbContext = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
 
+        // Load each rule's primary pattern PLUS any advanced additional patterns, so the cache holds one CachedRule per
+        // (rule, pattern). MatchingRules dedups rule ids, so a rule matching an action on several of its patterns still
+        // produces exactly one job (docs/35 Wave 3 multi-pattern).
         var rules = await dbContext.NotificationRules
             .IgnoreQueryFilters()
             .Where(r => r.Enabled)
-            .Select(r => new { r.Id, r.OrganizationId, r.EventPattern })
+            .Select(r => new { r.Id, r.OrganizationId, r.EventPattern, r.DigestCadence, Additional = r.AdditionalPatterns.Select(p => p.Pattern).ToList() })
             .ToListAsync(cancellationToken);
 
         _byOrg = rules
             .GroupBy(r => r.OrganizationId)
             .ToDictionary(
                 g => g.Key,
-                g => (IReadOnlyList<CachedRule>)g.Select(r => new CachedRule(r.Id, r.EventPattern)).ToList());
+                g => (IReadOnlyList<CachedRule>)g
+                    .SelectMany(r => r.Additional.Prepend(r.EventPattern).Select(pattern => new CachedRule(r.Id, pattern, r.DigestCadence)))
+                    .ToList());
         _loaded = true;
     }
 
-    public sealed record CachedRule(Guid RuleId, string Pattern);
+    public sealed record CachedRule(Guid RuleId, string Pattern, DigestCadence Cadence);
 }

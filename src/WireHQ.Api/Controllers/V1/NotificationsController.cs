@@ -44,13 +44,19 @@ public sealed class NotificationsController : ApiControllerBase
     [HttpPost("rules")]
     public async Task<IActionResult> Create(CreateNotificationRuleRequest request, CancellationToken cancellationToken) =>
         Created(await Sender.Send(
-            new CreateNotificationRuleCommand(request.Name, request.EventPattern, request.ChannelKind, request.Audience, request.AudienceRef),
+            new CreateNotificationRuleCommand(
+                request.Name, request.EventPattern, request.ChannelKind, request.Audience, request.AudienceRef,
+                request.AdditionalPatterns, request.DigestCadence,
+                request.QuietHoursStart, request.QuietHoursEnd, request.QuietHoursTimeZone, request.EscalationSteps),
             cancellationToken));
 
     [HttpPut("rules/{id:guid}")]
     public async Task<IActionResult> Update(Guid id, UpdateNotificationRuleRequest request, CancellationToken cancellationToken) =>
         NoContent(await Sender.Send(
-            new UpdateNotificationRuleCommand(id, request.Name, request.EventPattern, request.ChannelKind, request.Audience, request.AudienceRef),
+            new UpdateNotificationRuleCommand(
+                id, request.Name, request.EventPattern, request.ChannelKind, request.Audience, request.AudienceRef,
+                request.AdditionalPatterns, request.DigestCadence,
+                request.QuietHoursStart, request.QuietHoursEnd, request.QuietHoursTimeZone, request.EscalationSteps),
             cancellationToken));
 
     [HttpPost("rules/{id:guid}/status")]
@@ -65,13 +71,29 @@ public sealed class NotificationsController : ApiControllerBase
     [HttpDelete("rules/{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken) =>
         NoContent(await Sender.Send(new DeleteNotificationRuleCommand(id), cancellationToken));
+
+    /// <summary>The org's active (unacknowledged) escalation alerts — for the acknowledge UI.</summary>
+    [HttpGet("alerts/active")]
+    public async Task<IActionResult> ActiveEscalations(CancellationToken cancellationToken) =>
+        Ok(await Sender.Send(new ListActiveEscalationsQuery(), cancellationToken));
+
+    /// <summary>Acknowledge an escalation alert — stops the chain. Gated on <c>notifications.acknowledge</c>.</summary>
+    [HttpPost("alerts/{jobId:guid}/acknowledge")]
+    public async Task<IActionResult> AcknowledgeAlert(Guid jobId, CancellationToken cancellationToken) =>
+        NoContent(await Sender.Send(new AcknowledgeNotificationAlertCommand(jobId), cancellationToken));
 }
 
 public sealed record CreateNotificationRuleRequest(
-    string Name, string EventPattern, ChannelKind ChannelKind, NotificationAudience Audience, Guid? AudienceRef);
+    string Name, string EventPattern, ChannelKind ChannelKind, NotificationAudience Audience, Guid? AudienceRef,
+    IReadOnlyCollection<string>? AdditionalPatterns = null, DigestCadence DigestCadence = DigestCadence.Immediate,
+    TimeOnly? QuietHoursStart = null, TimeOnly? QuietHoursEnd = null, string? QuietHoursTimeZone = null,
+    IReadOnlyCollection<EscalationStepSpec>? EscalationSteps = null);
 
 public sealed record UpdateNotificationRuleRequest(
-    string Name, string EventPattern, ChannelKind ChannelKind, NotificationAudience Audience, Guid? AudienceRef);
+    string Name, string EventPattern, ChannelKind ChannelKind, NotificationAudience Audience, Guid? AudienceRef,
+    IReadOnlyCollection<string>? AdditionalPatterns = null, DigestCadence DigestCadence = DigestCadence.Immediate,
+    TimeOnly? QuietHoursStart = null, TimeOnly? QuietHoursEnd = null, string? QuietHoursTimeZone = null,
+    IReadOnlyCollection<EscalationStepSpec>? EscalationSteps = null);
 
 public sealed record SetNotificationRuleStatusRequest(bool Enabled);
 

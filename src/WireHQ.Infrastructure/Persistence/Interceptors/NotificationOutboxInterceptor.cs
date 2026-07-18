@@ -68,9 +68,11 @@ public sealed class NotificationOutboxInterceptor(
             }
 
             var summary = NotificationSummary.From(audit).Summary;
-            foreach (var ruleId in ruleIds)
+            foreach (var matched in ruleIds)
             {
-                (jobs ??= []).Add(NotificationJob.Create(organizationId, ruleId, audit.Id, audit.Action, summary, now));
+                // Stamp the matched rule's digest cadence onto the job (from the in-memory cache — no extra query) so the
+                // drain can route it to immediate-expand vs digest-flush by a SQL-level filter (docs/35 §4.5).
+                (jobs ??= []).Add(NotificationJob.Create(organizationId, matched.RuleId, audit.Id, audit.Action, summary, matched.Cadence, now));
             }
         }
 

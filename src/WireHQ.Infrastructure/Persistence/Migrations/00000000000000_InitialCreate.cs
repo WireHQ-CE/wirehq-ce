@@ -509,11 +509,15 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                     rule_id = table.Column<Guid>(type: "uuid", nullable: false),
                     job_id = table.Column<Guid>(type: "uuid", nullable: false),
                     channel_kind = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
-                    required_feature = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    required_features = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false, defaultValue: ""),
                     recipient = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: false),
                     rendered_subject = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
                     rendered_body = table.Column<string>(type: "text", nullable: false),
                     dedup_value = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    quiet_hours_start = table.Column<TimeOnly>(type: "time without time zone", nullable: true),
+                    quiet_hours_end = table.Column<TimeOnly>(type: "time without time zone", nullable: true),
+                    quiet_hours_time_zone = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    escalation_level = table.Column<int>(type: "integer", nullable: false),
                     status = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
                     attempts = table.Column<int>(type: "integer", nullable: false),
                     next_attempt_at_utc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
@@ -538,8 +542,14 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                     audit_log_id = table.Column<Guid>(type: "uuid", nullable: true),
                     action = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     summary_snapshot = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: false),
+                    digest_cadence = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
                     status = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
-                    created_at_utc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    created_at_utc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    escalation_level = table.Column<int>(type: "integer", nullable: false),
+                    escalation_step_count = table.Column<int>(type: "integer", nullable: false),
+                    escalation_next_due_at_utc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    acknowledged_at_utc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    acknowledged_by = table.Column<Guid>(type: "uuid", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -577,7 +587,12 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                     channel_kind = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
                     audience = table.Column<string>(type: "character varying(24)", maxLength: 24, nullable: false),
                     audience_ref = table.Column<Guid>(type: "uuid", nullable: true),
-                    required_feature = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    required_features = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false, defaultValue: ""),
+                    digest_cadence = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
+                    next_digest_at_utc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    quiet_hours_start = table.Column<TimeOnly>(type: "time without time zone", nullable: true),
+                    quiet_hours_end = table.Column<TimeOnly>(type: "time without time zone", nullable: true),
+                    quiet_hours_time_zone = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
                     enabled = table.Column<bool>(type: "boolean", nullable: false),
                     created_at_utc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     created_by = table.Column<Guid>(type: "uuid", nullable: true),
@@ -1096,6 +1111,51 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "notification_escalation_steps",
+                schema: "identity",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    rule_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    step_order = table.Column<int>(type: "integer", nullable: false),
+                    delay_minutes = table.Column<int>(type: "integer", nullable: false),
+                    channel_kind = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
+                    audience = table.Column<string>(type: "character varying(24)", maxLength: 24, nullable: false),
+                    audience_ref = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_notification_escalation_steps", x => x.id);
+                    table.ForeignKey(
+                        name: "fk_notification_escalation_steps_notification_rules_rule_id",
+                        column: x => x.rule_id,
+                        principalSchema: "identity",
+                        principalTable: "notification_rules",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "notification_rule_patterns",
+                schema: "identity",
+                columns: table => new
+                {
+                    rule_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    pattern = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_notification_rule_patterns", x => new { x.rule_id, x.pattern });
+                    table.ForeignKey(
+                        name: "fk_notification_rule_patterns_notification_rules_rule_id",
+                        column: x => x.rule_id,
+                        principalSchema: "identity",
+                        principalTable: "notification_rules",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "role_permissions",
                 schema: "identity",
                 columns: table => new
@@ -1361,10 +1421,28 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                 columns: new[] { "status", "next_attempt_at_utc" });
 
             migrationBuilder.CreateIndex(
-                name: "ix_notification_jobs_status",
+                name: "ix_notification_escalation_steps_rule_id",
+                schema: "identity",
+                table: "notification_escalation_steps",
+                column: "rule_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_notification_jobs_rule_id",
                 schema: "identity",
                 table: "notification_jobs",
-                column: "status");
+                column: "rule_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_notification_jobs_status_digest_cadence",
+                schema: "identity",
+                table: "notification_jobs",
+                columns: new[] { "status", "digest_cadence" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_notification_jobs_status_escalation_due",
+                schema: "identity",
+                table: "notification_jobs",
+                columns: new[] { "status", "escalation_next_due_at_utc" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_notification_preferences_user_id",
@@ -1372,6 +1450,12 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                 table: "notification_preferences",
                 column: "user_id",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_notification_rules_next_digest_at",
+                schema: "identity",
+                table: "notification_rules",
+                column: "next_digest_at_utc");
 
             migrationBuilder.CreateIndex(
                 name: "ix_notification_rules_organization_id",
@@ -1649,6 +1733,10 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                 schema: "identity");
 
             migrationBuilder.DropTable(
+                name: "notification_escalation_steps",
+                schema: "identity");
+
+            migrationBuilder.DropTable(
                 name: "notification_jobs",
                 schema: "identity");
 
@@ -1657,7 +1745,7 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                 schema: "identity");
 
             migrationBuilder.DropTable(
-                name: "notification_rules",
+                name: "notification_rule_patterns",
                 schema: "identity");
 
             migrationBuilder.DropTable(
@@ -1743,6 +1831,10 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
             migrationBuilder.DropTable(
                 name: "memberships",
                 schema: "core");
+
+            migrationBuilder.DropTable(
+                name: "notification_rules",
+                schema: "identity");
 
             migrationBuilder.DropTable(
                 name: "roles",

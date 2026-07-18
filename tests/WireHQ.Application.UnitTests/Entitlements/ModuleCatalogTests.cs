@@ -16,6 +16,8 @@ public sealed class ModuleCatalogTests
     [InlineData("custom-roles", PlanFeatures.CustomRoles)]
     [InlineData("api-extensions", PlanFeatures.ApiKeys)]
     [InlineData("audit-export", PlanFeatures.AuditExport)]
+    [InlineData("teams-connector", PlanFeatures.NotificationsChat)]
+    [InlineData("advanced-notifications", PlanFeatures.NotificationsRouting)]
     public void Gate_only_modules_are_kept_core_and_map_to_their_feature(string slug, string feature)
     {
         var module = ModuleCatalog.Find(slug);

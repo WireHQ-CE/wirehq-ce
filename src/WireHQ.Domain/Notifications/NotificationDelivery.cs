@@ -13,7 +13,7 @@ namespace WireHQ.Domain.Notifications;
 /// <para>
 /// <see cref="DedupValue"/> is a plain value (a provider idempotency key for SMS), <b>not</b> a unique constraint —
 /// a DB uniqueness check on a row the interceptor path can reach would risk failing the business transaction
-/// (docs/35 blocker B-5). <see cref="RequiredFeature"/> is copied from the rule so the sender can re-check the live
+/// (docs/35 blocker B-5). <see cref="RequiredFeatures"/> is copied from the rule so the sender can re-check the live
 /// entitlement union before sending (MM-14) without loading the rule.
 /// </para>
 /// </summary>
@@ -40,19 +40,24 @@ public sealed class NotificationDelivery : Entity, ITenantOwned
     }
 
     private NotificationDelivery(
-        Guid id, Guid organizationId, Guid ruleId, Guid jobId, ChannelKind channel, string? requiredFeature,
-        string recipient, string subject, string body, string? dedupValue, DateTimeOffset nowUtc)
+        Guid id, Guid organizationId, Guid ruleId, Guid jobId, ChannelKind channel, IReadOnlyCollection<string> requiredFeatures,
+        string recipient, string subject, string body, string? dedupValue, DateTimeOffset nowUtc,
+        TimeOnly? quietHoursStart, TimeOnly? quietHoursEnd, string? quietHoursTimeZone, int escalationLevel)
         : base(id)
     {
         OrganizationId = organizationId;
         RuleId = ruleId;
         JobId = jobId;
         ChannelKind = channel;
-        RequiredFeature = requiredFeature;
+        RequiredFeatures = requiredFeatures;
         Recipient = recipient;
         RenderedSubject = subject;
         RenderedBody = body;
         DedupValue = dedupValue;
+        QuietHoursStart = quietHoursStart;
+        QuietHoursEnd = quietHoursEnd;
+        QuietHoursTimeZone = quietHoursTimeZone;
+        EscalationLevel = escalationLevel;
         Status = NotificationDeliveryStatus.Pending;
         Attempts = 0;
         NextAttemptAtUtc = nowUtc; // first attempt is due immediately
@@ -67,8 +72,10 @@ public sealed class NotificationDelivery : Entity, ITenantOwned
 
     public ChannelKind ChannelKind { get; private set; }
 
-    /// <summary>The entitlement feature this delivery needs (null = free-core Email); re-checked by the sender.</summary>
-    public string? RequiredFeature { get; private set; }
+    /// <summary>The entitlement feature keys, <b>all</b> of which this delivery needs (empty = free-core Email);
+    /// re-checked by the sender against the live union before every send (MM-14) — set-valued so revoking any one of
+    /// a rule's modules (e.g. the Chat channel OR the routing module) stops it. Stored delimited; exposed as a set.</summary>
+    public IReadOnlyCollection<string> RequiredFeatures { get; private set; } = Array.Empty<string>();
 
     /// <summary>The channel-specific address (email address, chat webhook is on the config, phone number).</summary>
     public string Recipient { get; private set; } = null!;
@@ -79,6 +86,18 @@ public sealed class NotificationDelivery : Entity, ITenantOwned
 
     /// <summary>Idempotency value passed to provider-side dedup (SMS). Not a DB unique constraint (B-5).</summary>
     public string? DedupValue { get; private set; }
+
+    /// <summary>The rule's quiet-hours window <b>copied at expand</b> (docs/35 §5, Wave 3) so the send path can defer
+    /// without a rule load. Null (all three) = no quiet hours — a free-core rule, or a test send, is never deferred.</summary>
+    public TimeOnly? QuietHoursStart { get; private set; }
+
+    public TimeOnly? QuietHoursEnd { get; private set; }
+
+    public string? QuietHoursTimeZone { get; private set; }
+
+    /// <summary>Which escalation level produced this delivery (docs/35 §5): <b>0 = the primary</b>, N = escalation step N.
+    /// The drain groups a job's deliveries by level to decide whether the current level has been reached.</summary>
+    public int EscalationLevel { get; private set; }
 
     public NotificationDeliveryStatus Status { get; private set; }
 
@@ -96,10 +115,13 @@ public sealed class NotificationDelivery : Entity, ITenantOwned
     public DateTimeOffset? DeliveredAtUtc { get; private set; }
 
     public static NotificationDelivery Create(
-        Guid organizationId, Guid ruleId, Guid jobId, ChannelKind channel, string? requiredFeature,
-        string recipient, string subject, string body, string? dedupValue, DateTimeOffset nowUtc) =>
-        new(Guid.CreateVersion7(), organizationId, ruleId, jobId, channel, requiredFeature,
-            recipient, Truncate(subject, MaxSubjectLength)!, body, dedupValue, nowUtc);
+        Guid organizationId, Guid ruleId, Guid jobId, ChannelKind channel, IReadOnlyCollection<string> requiredFeatures,
+        string recipient, string subject, string body, string? dedupValue, DateTimeOffset nowUtc,
+        TimeOnly? quietHoursStart = null, TimeOnly? quietHoursEnd = null, string? quietHoursTimeZone = null,
+        int escalationLevel = 0) =>
+        new(Guid.CreateVersion7(), organizationId, ruleId, jobId, channel, requiredFeatures,
+            recipient, Truncate(subject, MaxSubjectLength)!, body, dedupValue, nowUtc,
+            quietHoursStart, quietHoursEnd, quietHoursTimeZone, escalationLevel);
 
     /// <summary>A successful send — done.</summary>
     public void MarkSucceeded(int? responseCode, DateTimeOffset nowUtc)
@@ -139,6 +161,26 @@ public sealed class NotificationDelivery : Entity, ITenantOwned
         LastError = Truncate(reason, MaxErrorLength);
         NextAttemptAtUtc = null;
     }
+
+    /// <summary>Hold a not-yet-sent delivery until <paramref name="untilUtc"/> because its rule is in quiet hours
+    /// (docs/35 §5). A deferral is NOT a failed attempt — <see cref="Attempts"/>, <see cref="Status"/> (stays
+    /// <see cref="NotificationDeliveryStatus.Pending"/>) and <see cref="CreatedAtUtc"/> are untouched; only the due time
+    /// moves. No-op once terminal.</summary>
+    public void Defer(DateTimeOffset untilUtc)
+    {
+        if (IsTerminal)
+        {
+            return;
+        }
+
+        NextAttemptAtUtc = untilUtc;
+    }
+
+    /// <summary>If this delivery's copied quiet-hours window is active at <paramref name="nowUtc"/>, the UTC instant it
+    /// should be deferred to (the window's end); otherwise null (send now). Always null when no window was copied — a
+    /// free-core rule or a test send.</summary>
+    public DateTimeOffset? QuietDeferUntil(DateTimeOffset nowUtc) =>
+        QuietHours.DeferUntil(QuietHoursStart, QuietHoursEnd, QuietHoursTimeZone, nowUtc);
 
     public bool IsTerminal =>
         Status is NotificationDeliveryStatus.Delivered or NotificationDeliveryStatus.Failed or NotificationDeliveryStatus.Cancelled;

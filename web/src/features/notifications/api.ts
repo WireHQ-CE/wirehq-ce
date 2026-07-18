@@ -9,10 +9,49 @@ export interface NotificationRule {
   id: string;
   name: string;
   eventPattern: string;
+  /** Advanced (notifications.routing): extra event globs this rule also matches, beyond the primary. */
+  additionalPatterns: string[];
+  /** Advanced (notifications.routing): Immediate, or a Daily/Weekly coalesced digest. */
+  digestCadence: 'Immediate' | 'Daily' | 'Weekly';
   channel: 'Email' | 'Chat' | 'Sms';
   audience: 'OptedInUsers' | 'Role';
   audienceRef: string | null;
+  /** Advanced (notifications.routing): quiet-hours window as "HH:mm:ss" in {@link quietHoursTimeZone}; null = off. */
+  quietHoursStart: string | null;
+  quietHoursEnd: string | null;
+  /** IANA time zone the quiet window is interpreted in; null = no quiet hours. */
+  quietHoursTimeZone: string | null;
+  /** Advanced (notifications.routing): the ordered escalation chain (empty = none). */
+  escalationSteps: EscalationStep[];
   enabled: boolean;
+  createdAtUtc: string;
+}
+
+/** One step of a rule's escalation chain (read shape). */
+export interface EscalationStep {
+  stepOrder: number;
+  delayMinutes: number;
+  channel: 'Email' | 'Chat';
+  audience: 'OptedInUsers' | 'Role';
+  audienceRef: string | null;
+}
+
+/** One escalation step (write shape — the server assigns order by position). */
+export interface EscalationStepInput {
+  delayMinutes: number;
+  channelKind: 'Email' | 'Chat';
+  audience: 'OptedInUsers' | 'Role';
+  audienceRef: string | null;
+}
+
+/** An active (unacknowledged) escalation alert — for the acknowledge UI. */
+export interface ActiveEscalation {
+  jobId: string;
+  action: string;
+  summary: string;
+  escalationLevel: number;
+  escalationStepCount: number;
+  nextDueAtUtc: string | null;
   createdAtUtc: string;
 }
 
@@ -39,9 +78,19 @@ export interface NotificationDelivery {
 export interface UpsertRuleInput {
   name: string;
   eventPattern: string;
+  /** Advanced (notifications.routing): extra event globs; [] for a plain single-event rule. */
+  additionalPatterns: string[];
+  /** Advanced (notifications.routing): 'Immediate' | 'Daily' | 'Weekly'. */
+  digestCadence: 'Immediate' | 'Daily' | 'Weekly';
   channelKind: 'Email' | 'Chat';
   audience: 'OptedInUsers' | 'Role';
   audienceRef: string | null;
+  /** Advanced (notifications.routing): quiet-hours window ("HH:mm:ss") + IANA time zone; all null = off. */
+  quietHoursStart: string | null;
+  quietHoursEnd: string | null;
+  quietHoursTimeZone: string | null;
+  /** Advanced (notifications.routing): the escalation chain ([] = none). */
+  escalationSteps: EscalationStepInput[];
 }
 
 /** Per-channel config status — never the destination URL (a bearer secret). */
@@ -115,5 +164,23 @@ export function useSetChatDestination() {
   return useMutation({
     mutationFn: (input: SetChatDestinationInput) => api.put<void>('/api/v1/notifications/channel-configs/chat', input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notification-channel-configs'] }),
+  });
+}
+
+const activeEscalationsKey = ['notification-active-escalations'] as const;
+
+/** The org's active (unacknowledged) escalation alerts — gated on notifications.acknowledge server-side. */
+export function useActiveEscalations() {
+  return useQuery({
+    queryKey: activeEscalationsKey,
+    queryFn: () => api.get<ActiveEscalation[]>('/api/v1/notifications/alerts/active'),
+  });
+}
+
+export function useAcknowledgeAlert() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (jobId: string) => api.post<void>(`/api/v1/notifications/alerts/${jobId}/acknowledge`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: activeEscalationsKey }),
   });
 }

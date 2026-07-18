@@ -943,6 +943,10 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("delivered_at_utc");
 
+                    b.Property<int>("EscalationLevel")
+                        .HasColumnType("integer")
+                        .HasColumnName("escalation_level");
+
                     b.Property<Guid>("JobId")
                         .HasColumnType("uuid")
                         .HasColumnName("job_id");
@@ -964,6 +968,19 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
 
+                    b.Property<TimeOnly?>("QuietHoursEnd")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("quiet_hours_end");
+
+                    b.Property<TimeOnly?>("QuietHoursStart")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("quiet_hours_start");
+
+                    b.Property<string>("QuietHoursTimeZone")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("quiet_hours_time_zone");
+
                     b.Property<string>("Recipient")
                         .IsRequired()
                         .HasMaxLength(320)
@@ -981,10 +998,13 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(256)")
                         .HasColumnName("rendered_subject");
 
-                    b.Property<string>("RequiredFeature")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
-                        .HasColumnName("required_feature");
+                    b.Property<string>("RequiredFeatures")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasDefaultValue("")
+                        .HasColumnName("required_features");
 
                     b.Property<Guid>("RuleId")
                         .HasColumnType("uuid")
@@ -1008,11 +1028,62 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                     b.ToTable("notification_deliveries", "identity");
                 });
 
+            modelBuilder.Entity("WireHQ.Domain.Notifications.NotificationEscalationStep", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Audience")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("audience");
+
+                    b.Property<Guid?>("AudienceRef")
+                        .HasColumnType("uuid")
+                        .HasColumnName("audience_ref");
+
+                    b.Property<string>("ChannelKind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("channel_kind");
+
+                    b.Property<int>("DelayMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("delay_minutes");
+
+                    b.Property<Guid>("RuleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rule_id");
+
+                    b.Property<int>("StepOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("step_order");
+
+                    b.HasKey("Id")
+                        .HasName("pk_notification_escalation_steps");
+
+                    b.HasIndex("RuleId")
+                        .HasDatabaseName("ix_notification_escalation_steps_rule_id");
+
+                    b.ToTable("notification_escalation_steps", "identity");
+                });
+
             modelBuilder.Entity("WireHQ.Domain.Notifications.NotificationJob", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("AcknowledgedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("acknowledged_at_utc");
+
+                    b.Property<Guid?>("AcknowledgedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("acknowledged_by");
 
                     b.Property<string>("Action")
                         .IsRequired()
@@ -1027,6 +1098,24 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
+
+                    b.Property<string>("DigestCadence")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("digest_cadence");
+
+                    b.Property<int>("EscalationLevel")
+                        .HasColumnType("integer")
+                        .HasColumnName("escalation_level");
+
+                    b.Property<DateTimeOffset?>("EscalationNextDueAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("escalation_next_due_at_utc");
+
+                    b.Property<int>("EscalationStepCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("escalation_step_count");
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
@@ -1051,8 +1140,14 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_notification_jobs");
 
-                    b.HasIndex("Status")
-                        .HasDatabaseName("ix_notification_jobs_status");
+                    b.HasIndex("RuleId")
+                        .HasDatabaseName("ix_notification_jobs_rule_id");
+
+                    b.HasIndex("Status", "DigestCadence")
+                        .HasDatabaseName("ix_notification_jobs_status_digest_cadence");
+
+                    b.HasIndex("Status", "EscalationNextDueAtUtc")
+                        .HasDatabaseName("ix_notification_jobs_status_escalation_due");
 
                     b.ToTable("notification_jobs", "identity");
                 });
@@ -1087,6 +1182,12 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_by");
 
+                    b.Property<string>("DigestCadence")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("digest_cadence");
+
                     b.Property<bool>("Enabled")
                         .HasColumnType("boolean")
                         .HasColumnName("enabled");
@@ -1103,14 +1204,34 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(128)")
                         .HasColumnName("name");
 
+                    b.Property<DateTimeOffset?>("NextDigestAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_digest_at_utc");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
 
-                    b.Property<string>("RequiredFeature")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
-                        .HasColumnName("required_feature");
+                    b.Property<TimeOnly?>("QuietHoursEnd")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("quiet_hours_end");
+
+                    b.Property<TimeOnly?>("QuietHoursStart")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("quiet_hours_start");
+
+                    b.Property<string>("QuietHoursTimeZone")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("quiet_hours_time_zone");
+
+                    b.Property<string>("RequiredFeatures")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasDefaultValue("")
+                        .HasColumnName("required_features");
 
                     b.Property<DateTimeOffset?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -1123,10 +1244,30 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_notification_rules");
 
+                    b.HasIndex("NextDigestAtUtc")
+                        .HasDatabaseName("ix_notification_rules_next_digest_at");
+
                     b.HasIndex("OrganizationId")
                         .HasDatabaseName("ix_notification_rules_organization_id");
 
                     b.ToTable("notification_rules", "identity");
+                });
+
+            modelBuilder.Entity("WireHQ.Domain.Notifications.NotificationRulePattern", b =>
+                {
+                    b.Property<Guid>("RuleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rule_id");
+
+                    b.Property<string>("Pattern")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("pattern");
+
+                    b.HasKey("RuleId", "Pattern")
+                        .HasName("pk_notification_rule_patterns");
+
+                    b.ToTable("notification_rule_patterns", "identity");
                 });
 
             modelBuilder.Entity("WireHQ.Domain.Onboarding.OnboardingProfile", b =>
@@ -3155,6 +3296,26 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                     b.Navigation("Roles");
                 });
 
+            modelBuilder.Entity("WireHQ.Domain.Notifications.NotificationEscalationStep", b =>
+                {
+                    b.HasOne("WireHQ.Domain.Notifications.NotificationRule", null)
+                        .WithMany("EscalationSteps")
+                        .HasForeignKey("RuleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notification_escalation_steps_notification_rules_rule_id");
+                });
+
+            modelBuilder.Entity("WireHQ.Domain.Notifications.NotificationRulePattern", b =>
+                {
+                    b.HasOne("WireHQ.Domain.Notifications.NotificationRule", null)
+                        .WithMany("AdditionalPatterns")
+                        .HasForeignKey("RuleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notification_rule_patterns_notification_rules_rule_id");
+                });
+
             modelBuilder.Entity("WireHQ.Domain.Organizations.Organization", b =>
                 {
                     b.OwnsOne("WireHQ.Domain.ValueObjects.Slug", "Slug", b1 =>
@@ -3278,6 +3439,13 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("WireHQ.Domain.Authorization.Role", b =>
                 {
                     b.Navigation("Permissions");
+                });
+
+            modelBuilder.Entity("WireHQ.Domain.Notifications.NotificationRule", b =>
+                {
+                    b.Navigation("AdditionalPatterns");
+
+                    b.Navigation("EscalationSteps");
                 });
 
             modelBuilder.Entity("WireHQ.Domain.Teams.Team", b =>

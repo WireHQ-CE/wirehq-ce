@@ -30,6 +30,8 @@ public sealed class PlanCatalogTests
         plan.Has(PlanFeatures.DriftAutoReconverge).Should().BeTrue();
         plan.Has(PlanFeatures.Teams).Should().BeTrue();
         plan.Has(PlanFeatures.BulkEnrollment).Should().BeTrue();
+        plan.Has(PlanFeatures.NotificationsRouting).Should().BeTrue("Advanced Notifications routing is a Pro+ feature (docs/35 Wave 3)");
+        plan.Has(PlanFeatures.NotificationsChat).Should().BeFalse("Chat Alerts is Enterprise-only, not in Pro");
         plan.Has(PlanFeatures.Sso).Should().BeFalse("SSO is a roadmap feature, not yet built");
         plan.Has(PlanFeatures.Ldap).Should().BeFalse("LDAP/AD directory sync is Enterprise-only, not in Pro");
         plan.Limit(PlanResource.Instances).Should().Be(50);
@@ -52,6 +54,7 @@ public sealed class PlanCatalogTests
         plan.Has(PlanFeatures.CustomRoles).Should().BeTrue("custom roles is built and is an Enterprise feature (docs/25)");
         plan.Has(PlanFeatures.ApiKeys).Should().BeTrue("API keys is built and is an Enterprise feature (docs/26)");
         plan.Has(PlanFeatures.NotificationsChat).Should().BeTrue("Chat Alerts is built and is an Enterprise feature (docs/35 Wave 2)");
+        plan.Has(PlanFeatures.NotificationsRouting).Should().BeTrue("Advanced Notifications routing is a Pro+ feature, so Enterprise holds it too (docs/35 Wave 3)");
         plan.IsUnlimited(PlanResource.Instances).Should().BeTrue();
         plan.IsUnlimited(PlanResource.Peers).Should().BeTrue();
     }

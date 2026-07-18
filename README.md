@@ -151,8 +151,9 @@ and unlocks instantly on your existing install.
 | **Customisation & Rebranding** | Your logo, accent colour, product name and favicon throughout the app. |
 | **API Extensions** | Scoped API keys and signed outbound webhooks for automation. |
 | **Chat Alerts** | Route notifications to a **Microsoft Teams** or **Slack** channel. |
+| **Advanced Notifications** | Multi-pattern rules, email beyond the free quota, daily/weekly digests, quiet hours, and escalation chains with acknowledgement. |
 
-*More on the way* — SSO / SAML, LDAP directory sync, access policies, advanced notifications, scheduled
+*More on the way* — SSO / SAML, LDAP directory sync, access policies, scheduled
 reporting, and backup & disaster-recovery are in progress. See the [Marketplace](https://wirehq.net/marketplace)
 for the current lineup and pricing.
 

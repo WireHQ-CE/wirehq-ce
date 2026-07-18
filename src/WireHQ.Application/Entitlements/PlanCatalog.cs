@@ -39,8 +39,16 @@ public static class PlanFeatures
     // Notifications — Chat Alerts (Teams/Slack), docs/35 Wave 2. The free-core Email channel is ungated; a rule that
     // targets a Chat channel requires this key (channel-includes-its-rules, docs/35 N-5). Granted to Enterprise in
     // SaaS; sold à-la-carte as the `teams-connector` CE Marketplace module (GateOnly — kept-core, activation lights
-    // it up). notifications.sms + notifications.routing are reserved for later waves.
+    // it up).
     public const string NotificationsChat = "notifications.chat";
+
+    // Notifications — Advanced routing (docs/35 Wave 3). Advanced rule shapes — multi-pattern rules, digests,
+    // quiet-hours, escalation chains, and email beyond the free quota — require this key; a single Email rule on a
+    // curated event stays free-core (N-4). This is NOT a prerequisite for Chat/SMS (N-5 — routing is advanced-only).
+    // Granted to Pro AND Enterprise (Pro+; editions do not inherit, so both list it); sold à-la-carte as the
+    // `advanced-notifications` CE Marketplace module (GateOnly — kept-core, activation lights it up).
+    // notifications.sms stays reserved for Wave 4.
+    public const string NotificationsRouting = "notifications.routing";
 }
 
 /// <summary>A countable resource a plan caps. <see cref="PlanDefinition.Unlimited"/> means no cap.</summary>
@@ -118,6 +126,7 @@ public sealed class PlanCatalog : IPlanCatalog
         Features: new HashSet<string>
         {
             PlanFeatures.FleetDashboard, PlanFeatures.DriftAutoReconverge, PlanFeatures.Teams, PlanFeatures.BulkEnrollment,
+            PlanFeatures.NotificationsRouting,
         },
         Limits: new Dictionary<PlanResource, int>
         {
@@ -143,7 +152,7 @@ public sealed class PlanCatalog : IPlanCatalog
         {
             PlanFeatures.FleetDashboard, PlanFeatures.DriftAutoReconverge, PlanFeatures.Teams, PlanFeatures.BulkEnrollment,
             PlanFeatures.AuditExport, PlanFeatures.Sso, PlanFeatures.Scim, PlanFeatures.AccessPolicies, PlanFeatures.Ldap,
-            PlanFeatures.CustomRoles, PlanFeatures.ApiKeys, PlanFeatures.NotificationsChat,
+            PlanFeatures.CustomRoles, PlanFeatures.ApiKeys, PlanFeatures.NotificationsChat, PlanFeatures.NotificationsRouting,
         },
         Limits: new Dictionary<PlanResource, int>());
 

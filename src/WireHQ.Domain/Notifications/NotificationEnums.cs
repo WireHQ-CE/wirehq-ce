@@ -45,3 +45,19 @@ public enum NotificationProviderKind
     Twilio = 3,
     Vonage = 4,
 }
+
+/// <summary>
+/// How a <see cref="NotificationRule"/> batches its matched events (docs/35-notifications.md §4.5, Wave 3 digests).
+/// <see cref="Immediate"/> sends one message per event (the free-core default); <see cref="Daily"/>/<see cref="Weekly"/>
+/// COALESCE a window's matched events into ONE periodic message — an <b>advanced</b> shape that requires
+/// <c>notifications.routing</c>. The cadence is also stamped onto each <c>NotificationJob</c> at capture so digest jobs
+/// can be excluded from the immediate-expand batch at the SQL level (never an in-memory skip — that livelocks the
+/// batch). Serialized as a string on the API boundary (the house convention).
+/// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum DigestCadence
+{
+    Immediate = 0,
+    Daily = 1,
+    Weekly = 2,
+}

@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using WireHQ.Domain.Notifications;
 
 namespace WireHQ.Infrastructure.Persistence.Configurations;
@@ -9,6 +11,26 @@ namespace WireHQ.Infrastructure.Persistence.Configurations;
 // change. Kept-core (the spine ships in every edition). Index names are explicit (EF derives them from table+column,
 // ignoring the schema). NB: notification_deliveries.dedup_value is deliberately NOT unique — a uniqueness check on a
 // row the interceptor path can reach would risk failing the business transaction (docs/35 B-5).
+
+/// <summary>Stores a rule/delivery's <c>RequiredFeatures</c> SET (docs/35 Wave 3, set-valued MM-14) as a single
+/// comma-delimited, non-null string column. Feature keys are dotted lowercase (<c>notifications.chat</c>) and never
+/// contain a comma, so the delimiter is unambiguous; the empty set round-trips as "" (free-core). Comparison is
+/// order-independent so the drain's set membership check is stable regardless of stored order.</summary>
+internal static class NotificationFeatureSetConverters
+{
+    private const char Delimiter = ',';
+
+    public static readonly ValueConverter<IReadOnlyCollection<string>, string> Converter =
+        new(v => string.Join(Delimiter, v),
+            v => string.IsNullOrEmpty(v)
+                ? Array.Empty<string>()
+                : v.Split(Delimiter, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+
+    public static readonly ValueComparer<IReadOnlyCollection<string>> Comparer =
+        new((a, b) => a!.OrderBy(x => x, StringComparer.Ordinal).SequenceEqual(b!.OrderBy(x => x, StringComparer.Ordinal)),
+            v => v.OrderBy(x => x, StringComparer.Ordinal).Aggregate(0, (h, s) => HashCode.Combine(h, s.GetHashCode(StringComparison.Ordinal))),
+            v => v.ToArray());
+}
 
 public sealed class NotificationRuleConfiguration : IEntityTypeConfiguration<NotificationRule>
 {
@@ -24,10 +46,76 @@ public sealed class NotificationRuleConfiguration : IEntityTypeConfiguration<Not
         builder.Property(r => r.EventPattern).HasMaxLength(NotificationRule.MaxPatternLength).IsRequired();
         builder.Property(r => r.ChannelKind).HasConversion<string>().HasMaxLength(16).IsRequired();
         builder.Property(r => r.Audience).HasConversion<string>().HasMaxLength(24).IsRequired();
-        builder.Property(r => r.RequiredFeature).HasMaxLength(128);
+        builder.Property(r => r.RequiredFeatures)
+            .HasColumnName("required_features")
+            .HasConversion(NotificationFeatureSetConverters.Converter, NotificationFeatureSetConverters.Comparer)
+            .HasMaxLength(512)
+            .IsRequired()
+            .HasDefaultValue(Array.Empty<string>());
         builder.Property(r => r.Enabled).IsRequired();
 
+        // Digests (docs/35 §4.5, Wave 3): the cadence + the next-flush cursor. A rule with a due cursor is picked up by
+        // the FlushDigestsAsync drain phase; the index covers that cross-tenant due-scan. Every insert supplies the
+        // cadence (the domain defaults it to Immediate); the migration backfills any pre-existing row with 'Immediate'.
+        builder.Property(r => r.DigestCadence).HasConversion<string>().HasMaxLength(16).IsRequired();
+        builder.Property(r => r.NextDigestAtUtc);
+        builder.HasIndex(r => r.NextDigestAtUtc).HasDatabaseName("ix_notification_rules_next_digest_at");
+
+        // Quiet hours (docs/35 §5, Wave 3): a per-rule local window during which deliveries are deferred (not dropped)
+        // to the window's end. All three nullable together (all-or-none, domain-enforced); TimeOnly maps to Postgres
+        // `time`. The migration adds them nullable, so pre-existing rules keep quiet hours off.
+        builder.Property(r => r.QuietHoursStart);
+        builder.Property(r => r.QuietHoursEnd);
+        builder.Property(r => r.QuietHoursTimeZone).HasMaxLength(64);
+
+        // Additional event globs on a multi-pattern (advanced) rule — a NORMAL composite-keyed child (RuleId, Pattern),
+        // the WebhookEventSubscription precedent, dodging the owned-collection append gotcha (ef-owned-collection-append).
+        // Mapped from the backing field so the aggregate owns the collection.
+        builder.HasMany(r => r.AdditionalPatterns)
+            .WithOne()
+            .HasForeignKey(p => p.RuleId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Metadata.FindNavigation(nameof(NotificationRule.AdditionalPatterns))!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
+
+        // Escalation chain (docs/35 §5, Wave 3) — surrogate-keyed children replaced wholesale by the aggregate; mapped
+        // from the backing field. Cascade-delete with the rule.
+        builder.HasMany(r => r.EscalationSteps)
+            .WithOne()
+            .HasForeignKey(s => s.RuleId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Metadata.FindNavigation(nameof(NotificationRule.EscalationSteps))!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
+
         builder.HasIndex(r => r.OrganizationId).HasDatabaseName("ix_notification_rules_organization_id");
+    }
+}
+
+public sealed class NotificationRulePatternConfiguration : IEntityTypeConfiguration<NotificationRulePattern>
+{
+    public void Configure(EntityTypeBuilder<NotificationRulePattern> builder)
+    {
+        builder.ToTable("notification_rule_patterns", "identity");
+        builder.HasKey(p => new { p.RuleId, p.Pattern });
+        builder.Property(p => p.Pattern).HasMaxLength(NotificationRule.MaxPatternLength).IsRequired();
+    }
+}
+
+public sealed class NotificationEscalationStepConfiguration : IEntityTypeConfiguration<NotificationEscalationStep>
+{
+    public void Configure(EntityTypeBuilder<NotificationEscalationStep> builder)
+    {
+        builder.ToTable("notification_escalation_steps", "identity");
+        builder.HasKey(s => s.Id);
+        builder.Property(s => s.Id).ValueGeneratedNever();
+
+        builder.Property(s => s.RuleId).IsRequired();
+        builder.Property(s => s.StepOrder).IsRequired();
+        builder.Property(s => s.DelayMinutes).IsRequired();
+        builder.Property(s => s.ChannelKind).HasConversion<string>().HasMaxLength(16).IsRequired();
+        builder.Property(s => s.Audience).HasConversion<string>().HasMaxLength(24).IsRequired();
+
+        builder.HasIndex(s => s.RuleId).HasDatabaseName("ix_notification_escalation_steps_rule_id");
     }
 }
 
@@ -45,8 +133,23 @@ public sealed class NotificationJobConfiguration : IEntityTypeConfiguration<Noti
         builder.Property(j => j.SummarySnapshot).HasMaxLength(NotificationJob.MaxSummaryLength).IsRequired();
         builder.Property(j => j.Status).HasConversion<string>().HasMaxLength(16).IsRequired();
 
-        // The expand sweep selects Pending jobs across all tenants (in a bypass scope).
-        builder.HasIndex(j => j.Status).HasDatabaseName("ix_notification_jobs_status");
+        // Digest cadence stamped at capture (docs/35 §4.5): the immediate-expand sweep selects Pending jobs with
+        // DigestCadence == Immediate (excluding digest jobs at the SQL level), so the (status, cadence) index covers it.
+        // Every insert supplies the cadence; the migration backfills any pre-existing row with 'Immediate'.
+        builder.Property(j => j.DigestCadence).HasConversion<string>().HasMaxLength(16).IsRequired();
+        builder.HasIndex(j => new { j.Status, j.DigestCadence }).HasDatabaseName("ix_notification_jobs_status_digest_cadence");
+        // FlushDigestsAsync gathers a rule's pending digest jobs by RuleId.
+        builder.HasIndex(j => j.RuleId).HasDatabaseName("ix_notification_jobs_rule_id");
+
+        // Escalation state (docs/35 §5, Wave 3). The drain's EscalateAsync selects Escalating jobs whose cursor is due;
+        // the (status, next-due) index covers that cross-tenant due-scan without a rule join (EscalationStepCount is
+        // denormalised). The migration defaults EscalationLevel/StepCount to 0 for pre-existing rows.
+        builder.Property(j => j.EscalationLevel).IsRequired();
+        builder.Property(j => j.EscalationStepCount).IsRequired();
+        builder.Property(j => j.EscalationNextDueAtUtc);
+        builder.Property(j => j.AcknowledgedAtUtc);
+        builder.Property(j => j.AcknowledgedBy);
+        builder.HasIndex(j => new { j.Status, j.EscalationNextDueAtUtc }).HasDatabaseName("ix_notification_jobs_status_escalation_due");
     }
 }
 
@@ -62,7 +165,12 @@ public sealed class NotificationDeliveryConfiguration : IEntityTypeConfiguration
         builder.Property(d => d.RuleId).IsRequired();
         builder.Property(d => d.JobId).IsRequired();
         builder.Property(d => d.ChannelKind).HasConversion<string>().HasMaxLength(16).IsRequired();
-        builder.Property(d => d.RequiredFeature).HasMaxLength(128);
+        builder.Property(d => d.RequiredFeatures)
+            .HasColumnName("required_features")
+            .HasConversion(NotificationFeatureSetConverters.Converter, NotificationFeatureSetConverters.Comparer)
+            .HasMaxLength(512)
+            .IsRequired()
+            .HasDefaultValue(Array.Empty<string>());
         builder.Property(d => d.Recipient).HasMaxLength(NotificationDelivery.MaxRecipientLength).IsRequired();
         builder.Property(d => d.RenderedSubject).HasMaxLength(NotificationDelivery.MaxSubjectLength).IsRequired();
         builder.Property(d => d.RenderedBody).IsRequired();
@@ -70,6 +178,13 @@ public sealed class NotificationDeliveryConfiguration : IEntityTypeConfiguration
         builder.Property(d => d.Status).HasConversion<string>().HasMaxLength(16).IsRequired();
         builder.Property(d => d.Attempts).IsRequired();
         builder.Property(d => d.LastError).HasMaxLength(NotificationDelivery.MaxErrorLength);
+
+        // Quiet-hours window copied from the rule at expand (docs/35 §5) so the send path defers without a rule load.
+        builder.Property(d => d.QuietHoursStart);
+        builder.Property(d => d.QuietHoursEnd);
+        builder.Property(d => d.QuietHoursTimeZone).HasMaxLength(64);
+        // Escalation level (docs/35 §5): 0 = primary, N = escalation step N. The migration defaults it to 0.
+        builder.Property(d => d.EscalationLevel).IsRequired();
 
         // RuleId/JobId are SOFT references (no FK) — the delete handler removes a rule's rows explicitly; a hard FK
         // could fail an unrelated business transaction (the webhook precedent, docs/35 §4.2).

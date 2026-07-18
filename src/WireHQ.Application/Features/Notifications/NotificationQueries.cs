@@ -13,7 +13,12 @@ namespace WireHQ.Application.Features.Notifications;
 // --- Rules ---
 
 public sealed record NotificationRuleDto(
-    Guid Id, string Name, string EventPattern, string Channel, string Audience, Guid? AudienceRef, bool Enabled, DateTimeOffset CreatedAtUtc);
+    Guid Id, string Name, string EventPattern, IReadOnlyList<string> AdditionalPatterns, string Channel, string Audience,
+    Guid? AudienceRef, string DigestCadence, TimeOnly? QuietHoursStart, TimeOnly? QuietHoursEnd, string? QuietHoursTimeZone,
+    IReadOnlyList<EscalationStepDto> EscalationSteps, bool Enabled, DateTimeOffset CreatedAtUtc);
+
+/// <summary>One escalation step in a rule's chain (docs/35 §5), ordered by <see cref="StepOrder"/>.</summary>
+public sealed record EscalationStepDto(int StepOrder, int DelayMinutes, string Channel, string Audience, Guid? AudienceRef);
 
 public sealed record ListNotificationRulesQuery : IQuery<IReadOnlyList<NotificationRuleDto>>, IAuthorizedRequest
 {
@@ -28,10 +33,44 @@ public sealed class ListNotificationRulesQueryHandler(IApplicationDbContext dbCo
         var rules = await dbContext.NotificationRules
             .OrderByDescending(r => r.Id)
             .Select(r => new NotificationRuleDto(
-                r.Id, r.Name, r.EventPattern, r.ChannelKind.ToString(), r.Audience.ToString(), r.AudienceRef, r.Enabled, r.CreatedAtUtc))
+                r.Id, r.Name, r.EventPattern, r.AdditionalPatterns.Select(p => p.Pattern).ToList(),
+                r.ChannelKind.ToString(), r.Audience.ToString(), r.AudienceRef, r.DigestCadence.ToString(),
+                r.QuietHoursStart, r.QuietHoursEnd, r.QuietHoursTimeZone,
+                r.EscalationSteps.OrderBy(s => s.StepOrder).Select(s => new EscalationStepDto(
+                    s.StepOrder, s.DelayMinutes, s.ChannelKind.ToString(), s.Audience.ToString(), s.AudienceRef)).ToList(),
+                r.Enabled, r.CreatedAtUtc))
             .ToListAsync(cancellationToken);
 
         return rules;
+    }
+}
+
+// --- Active escalations (the acknowledge UI) — org-scoped, gated on notifications.acknowledge ---
+
+public sealed record ActiveEscalationDto(
+    Guid JobId, string Action, string Summary, int EscalationLevel, int EscalationStepCount,
+    DateTimeOffset? NextDueAtUtc, DateTimeOffset CreatedAtUtc);
+
+public sealed record ListActiveEscalationsQuery : IQuery<IReadOnlyList<ActiveEscalationDto>>, IAuthorizedRequest
+{
+    public IReadOnlyCollection<string> RequiredPermissions => [Permissions.Notifications.Acknowledge];
+}
+
+public sealed class ListActiveEscalationsQueryHandler(IApplicationDbContext dbContext)
+    : IQueryHandler<ListActiveEscalationsQuery, IReadOnlyList<ActiveEscalationDto>>
+{
+    public async Task<Result<IReadOnlyList<ActiveEscalationDto>>> Handle(ListActiveEscalationsQuery query, CancellationToken cancellationToken)
+    {
+        // Org-scoped by the ambient tenant filter — the unacknowledged, actively-escalating alerts an acker can stop.
+        var alerts = await dbContext.NotificationJobs
+            .Where(j => j.Status == NotificationJobStatus.Escalating && j.AcknowledgedAtUtc == null)
+            .OrderBy(j => j.EscalationNextDueAtUtc)
+            .Take(100)
+            .Select(j => new ActiveEscalationDto(
+                j.Id, j.Action, j.SummarySnapshot, j.EscalationLevel, j.EscalationStepCount, j.EscalationNextDueAtUtc, j.CreatedAtUtc))
+            .ToListAsync(cancellationToken);
+
+        return alerts;
     }
 }
 

@@ -419,12 +419,22 @@ export const MARKETPLACE_MODULES: MarketplaceModule[] = [
     name: 'Advanced Notifications',
     category: 'Notifications',
     icon: Bell,
-    tagline: 'Routing rules, digests, quiet hours and escalation policies.',
+    // Copy advertises ONLY shipped highlights — all Wave-3 slices are now live: multi-pattern + email-beyond-quota +
+    // digests + quiet hours + escalation (docs/35 B-8/N-14; advertised one at a time as each shipped).
+    tagline: 'Route, batch, quiet, and escalate your notifications.',
     description:
-      'Take control of the notification stream: per-event routing rules, daily/weekly digests, quiet hours and simple escalation chains for unacknowledged critical events.',
-    highlights: ['Per-event routing rules', 'Digest scheduling', 'Quiet hours + escalation'],
+      'Take control of the notification stream: a single routing rule can match several event patterns at once, create email rules beyond the free-tier limit, coalesce events into daily or weekly digests, hold non-urgent alerts during quiet hours, and escalate to a backup channel or on-call role when no one acknowledges.',
+    highlights: [
+      'Multi-pattern routing rules',
+      'More email rules — beyond the free quota',
+      'Daily / weekly digests',
+      'Quiet hours (defer, don’t drop)',
+      'Escalation chains with acknowledgement',
+    ],
     price: 69,
-    availability: 'coming-soon',
+    availability: 'available',
+    feature: 'notifications.routing',
+    delivery: 'gate-only',
   },
   {
     slug: 'backup-manager',

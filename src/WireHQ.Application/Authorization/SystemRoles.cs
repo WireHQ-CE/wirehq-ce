@@ -32,6 +32,7 @@ public static class SystemRoles
                 Permissions.Modules.Manage,
                 Permissions.Branding.Manage,
                 Permissions.Notifications.Manage,
+                Permissions.Notifications.Acknowledge,
             ],
 
             [Member] =

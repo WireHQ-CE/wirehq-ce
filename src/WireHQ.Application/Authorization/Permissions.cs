@@ -107,6 +107,12 @@ public static class Permissions
         // seeded to Owner/Admin only. Free-core Email rules are permission-only (no feature key); Chat/SMS/advanced
         // rules ALSO require the channel/routing entitlement, enforced in the command. Kept core, every edition.
         public const string Manage = "notifications.manage";
+
+        // Acknowledge an in-flight escalation alert to stop the chain (docs/35 §5, Wave 3). A LESS-sensitive action
+        // than Manage — grantable to an on-call/responder role via custom roles WITHOUT conferring rule authoring or
+        // read of every event's detail. Acknowledging is a silencing action, so it is still a permission, never open
+        // to any authenticated member. Seeded to Owner/Admin (who also hold Manage) by default.
+        public const string Acknowledge = "notifications.acknowledge";
     }
 
     /// <summary>Full catalog, grouped for the seeder and the admin UI.</summary>
@@ -133,6 +139,7 @@ public static class Permissions
         new(Modules.Manage, "Marketplace", "Activate and deactivate module licences"),
         new(Branding.Manage, "Branding", "Configure the install's branding (name, colour, logo)"),
         new(Notifications.Manage, "Notifications", "Configure notification rules and channels"),
+        new(Notifications.Acknowledge, "Notifications", "Acknowledge alerts to stop an escalation chain"),
     ];
 }
 
