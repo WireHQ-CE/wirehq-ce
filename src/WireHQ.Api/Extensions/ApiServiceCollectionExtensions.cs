@@ -62,6 +62,7 @@ public static class ApiServiceCollectionExtensions
                 options.ReportApiVersions = true;
                 options.ApiVersionReader = new UrlSegmentApiVersionReader();
             })
+            .AddMvc()
             .AddApiExplorer(options =>
             {
                 options.GroupNameFormat = "'v'VVV";

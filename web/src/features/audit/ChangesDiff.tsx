@@ -19,7 +19,7 @@ function format(value: unknown): string {
 
 export function ChangesDiff({ changes }: { changes: string | null }) {
   if (!changes) {
-    return <p className="text-xs text-ink-400">No field changes recorded for this event.</p>;
+    return <p className="text-xs text-ink-500 dark:text-ink-400">No field changes recorded for this event.</p>;
   }
 
   let entries: ChangeEntry[];
@@ -35,16 +35,16 @@ export function ChangesDiff({ changes }: { changes: string | null }) {
       {entries.map((entry, i) => (
         <div key={i} className="rounded-md border dark:border-ink-800">
           <div className="flex items-center gap-2 border-b px-3 py-1.5 text-xs dark:border-ink-800">
-            <span className="font-medium uppercase tracking-wide text-ink-500">{entry.operation ?? 'changed'}</span>
+            <span className="font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">{entry.operation ?? 'changed'}</span>
             <span className="font-mono text-ink-700 dark:text-ink-200">{entry.entity ?? 'entity'}</span>
-            {entry.id && <span className="font-mono text-ink-400">{String(entry.id).slice(0, 8)}…</span>}
+            {entry.id && <span className="font-mono text-ink-500 dark:text-ink-400">{String(entry.id).slice(0, 8)}…</span>}
           </div>
           {entry.changes && Object.keys(entry.changes).length > 0 ? (
             <table className="w-full text-xs">
               <tbody>
                 {Object.entries(entry.changes).map(([prop, val]) => (
                   <tr key={prop} className="border-b last:border-0 dark:border-ink-800">
-                    <td className="w-1/4 px-3 py-1.5 font-mono text-ink-500">{prop}</td>
+                    <td className="w-1/4 px-3 py-1.5 font-mono text-ink-500 dark:text-ink-400">{prop}</td>
                     <td className="px-3 py-1.5 font-mono text-danger-600 line-through dark:text-danger-500">{format(val?.old)}</td>
                     <td className="px-3 py-1.5 font-mono text-success-700 dark:text-success-500">{format(val?.new)}</td>
                   </tr>
@@ -52,7 +52,7 @@ export function ChangesDiff({ changes }: { changes: string | null }) {
               </tbody>
             </table>
           ) : (
-            <p className="px-3 py-1.5 text-xs text-ink-400">No field-level detail.</p>
+            <p className="px-3 py-1.5 text-xs text-ink-500 dark:text-ink-400">No field-level detail.</p>
           )}
         </div>
       ))}

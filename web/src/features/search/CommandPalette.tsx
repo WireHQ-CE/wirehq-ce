@@ -151,7 +151,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     >
       <div className="mx-auto w-full max-w-lg overflow-hidden rounded-xl border border-ink-200 bg-ink-0 shadow-2xl dark:border-ink-700 dark:bg-ink-900">
         <div className="flex items-center gap-2.5 border-b border-ink-100 px-4 dark:border-ink-800">
-          <Search className="size-4 shrink-0 text-ink-400" />
+          <Search className="size-4 shrink-0 text-ink-500 dark:text-ink-400" />
           <input
             ref={inputRef}
             value={query}
@@ -167,18 +167,18 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             className="h-12 w-full bg-transparent text-base text-ink-900 outline-none focus-visible:shadow-none placeholder:text-ink-400 dark:text-ink-50"
             aria-label="Search pages, settings and actions"
           />
-          <kbd className="rounded border border-ink-200 px-1.5 text-xs text-ink-400 dark:border-ink-700">esc</kbd>
+          <kbd className="rounded border border-ink-200 px-1.5 text-xs text-ink-500 dark:text-ink-400 dark:border-ink-700">esc</kbd>
         </div>
 
         <div ref={listRef} className="max-h-[50vh] overflow-y-auto p-2">
           {results.length === 0 ? (
-            <p className="px-3 py-8 text-center text-sm text-ink-400">
+            <p className="px-3 py-8 text-center text-sm text-ink-500 dark:text-ink-400">
               No matches for “{query}” — try “MFA”, “users” or “WireGuard”.
             </p>
           ) : (
             grouped.map(({ section, items }) => (
               <div key={section}>
-                <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-400">
+                <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500 dark:text-ink-400">
                   {showRecentsLabel && section === grouped[0].section ? 'Recent & pages' : section}
                 </p>
                 {items.map((entry) => {
@@ -201,16 +201,16 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                       <entry.icon
                         className={cn(
                           'size-4 shrink-0',
-                          index === highlight ? 'text-gold-500 dark:text-gold-400' : 'text-ink-400',
+                          index === highlight ? 'text-gold-500 dark:text-gold-400' : 'text-ink-500 dark:text-ink-400',
                         )}
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">{entry.title}</span>
                         {entry.hint && (
-                          <span className="block truncate text-xs text-ink-400">{entry.hint}</span>
+                          <span className="block truncate text-xs text-ink-500 dark:text-ink-400">{entry.hint}</span>
                         )}
                       </span>
-                      {index === highlight && <CornerDownLeft className="size-3.5 shrink-0 text-ink-400" />}
+                      {index === highlight && <CornerDownLeft className="size-3.5 shrink-0 text-ink-500 dark:text-ink-400" />}
                     </button>
                   );
                 })}
@@ -219,7 +219,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           )}
         </div>
 
-        <div className="flex items-center gap-4 border-t border-ink-100 px-4 py-2 text-[11px] text-ink-400 dark:border-ink-800">
+        <div className="flex items-center gap-4 border-t border-ink-100 px-4 py-2 text-[11px] text-ink-500 dark:text-ink-400 dark:border-ink-800">
           <span>
             <kbd className="rounded border border-ink-200 px-1 dark:border-ink-700">↑↓</kbd> navigate
           </span>

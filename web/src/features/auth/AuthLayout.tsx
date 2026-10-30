@@ -25,10 +25,10 @@ export function AuthLayout({
         </Link>
         <div className="rounded-xl border border-ink-800 bg-ink-900 p-7 shadow-e3">
           <h1 className="text-h2 text-ink-50">{title}</h1>
-          <p className="mt-1 text-sm text-ink-400">{subtitle}</p>
+          <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">{subtitle}</p>
           <div className="mt-6">{children}</div>
         </div>
-        <div className="mt-5 text-center text-sm text-ink-400">{footer}</div>
+        <div className="mt-5 text-center text-sm text-ink-500 dark:text-ink-400">{footer}</div>
       </div>
     </div>
   );

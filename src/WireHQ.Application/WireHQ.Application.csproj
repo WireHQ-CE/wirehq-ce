@@ -6,7 +6,7 @@
     DbContext. No ASP.NET. This is where CQRS, validation, and the request pipeline live.
   -->
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>WireHQ.Application</RootNamespace>
     <!-- The XML doc file flows to the Api output and feeds the generated OpenAPI reference (docs/27). -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>

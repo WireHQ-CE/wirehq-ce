@@ -91,7 +91,7 @@ export function LoginPage() {
               onChange={(e) => setCode(e.target.value)}
             />
           </Field>
-          {errors.general && <p className="text-sm text-danger-500">{errors.general}</p>}
+          {errors.general && <p className="text-sm text-danger-700 dark:text-danger-500">{errors.general}</p>}
           <Button type="submit" className="w-full" disabled={submitting}>
             {submitting ? 'Verifying…' : 'Verify'}
           </Button>
@@ -117,7 +117,7 @@ export function LoginPage() {
     >
       <>
       {ssoFailed && (
-        <p className="mb-4 rounded-lg bg-danger-500/10 px-3 py-2 text-sm text-danger-500">
+        <p className="mb-4 rounded-lg bg-danger-500/10 px-3 py-2 text-sm text-danger-700 dark:text-danger-500">
           Single sign-on didn’t complete. Try again, or sign in with your email and password.
         </p>
       )}
@@ -129,12 +129,12 @@ export function LoginPage() {
           <Input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
         {captcha.widget}
-        {errors.general && <p className="text-sm text-danger-500">{errors.general}</p>}
+        {errors.general && <p className="text-sm text-danger-700 dark:text-danger-500">{errors.general}</p>}
         <Button type="submit" className="w-full" disabled={submitting || (captcha.required && !captcha.token)}>
           {submitting ? 'Signing in…' : 'Sign in'}
         </Button>
         <div className="text-center">
-          <Link to="/forgot-password" className="text-sm text-ink-400 hover:text-ink-200">
+          <Link to="/forgot-password" className="text-sm text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-ink-200">
             Forgot password?
           </Link>
         </div>
@@ -157,7 +157,7 @@ export function LoginPage() {
               </Button>
               <button
                 type="button"
-                className="block w-full text-center text-sm text-ink-400 hover:text-ink-200"
+                className="block w-full text-center text-sm text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-ink-200"
                 onClick={() => setSsoMode(false)}
               >
                 Back

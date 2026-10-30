@@ -10,6 +10,11 @@ namespace WireHQ.Modules.Orchestration.Domain;
 /// <b>hash</b> of the token is stored — the clear token is shown once and travels in the install command
 /// (<c>wirehq-agent enroll --token …</c>). The gateway's enrol endpoint looks it up by hash, checks it's
 /// unused + unexpired, then burns it. Tenant-owned + audited. (docs/12 §5/§8, ADR-019/028)
+/// <para>
+/// A token minted with a <see cref="RekeyAgentId"/> is a <b>re-key</b> token: redeeming it re-issues the certificate
+/// of that existing agent instead of creating a new one, so the agent keeps its id, name and instance bindings — the
+/// recovery path for an agent whose certificate expired. (docs/13 §6.2)
+/// </para>
 /// </summary>
 public sealed class AgentEnrollmentToken : AggregateRoot, ITenantOwned, IAuditable
 {
@@ -19,12 +24,13 @@ public sealed class AgentEnrollmentToken : AggregateRoot, ITenantOwned, IAuditab
     {
     }
 
-    private AgentEnrollmentToken(Guid id, Guid organizationId, string tokenHash, DateTimeOffset expiresAtUtc)
+    private AgentEnrollmentToken(Guid id, Guid organizationId, string tokenHash, DateTimeOffset expiresAtUtc, Guid? rekeyAgentId)
         : base(id)
     {
         OrganizationId = organizationId;
         TokenHash = tokenHash;
         ExpiresAtUtc = expiresAtUtc;
+        RekeyAgentId = rekeyAgentId;
     }
 
     public Guid OrganizationId { get; private set; }
@@ -34,6 +40,9 @@ public sealed class AgentEnrollmentToken : AggregateRoot, ITenantOwned, IAuditab
 
     public DateTimeOffset ExpiresAtUtc { get; private set; }
     public DateTimeOffset? UsedAtUtc { get; private set; }
+
+    /// <summary>The existing agent this token re-keys; null for an ordinary enrolment token.</summary>
+    public Guid? RekeyAgentId { get; private set; }
 
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public Guid? CreatedBy { get; private set; }
@@ -51,7 +60,14 @@ public sealed class AgentEnrollmentToken : AggregateRoot, ITenantOwned, IAuditab
     public static Result<AgentEnrollmentToken> Issue(Guid id, Guid organizationId, string tokenHash, DateTimeOffset expiresAtUtc) =>
         string.IsNullOrWhiteSpace(tokenHash)
             ? OrchestrationErrors.Agent.InvalidToken
-            : new AgentEnrollmentToken(id, organizationId, tokenHash, expiresAtUtc);
+            : new AgentEnrollmentToken(id, organizationId, tokenHash, expiresAtUtc, rekeyAgentId: null);
+
+    /// <summary>Issues a re-key token bound to <paramref name="agentId"/> (see the type remarks).</summary>
+    public static Result<AgentEnrollmentToken> IssueForRekey(
+        Guid id, Guid organizationId, string tokenHash, DateTimeOffset expiresAtUtc, Guid agentId) =>
+        string.IsNullOrWhiteSpace(tokenHash) || agentId == Guid.Empty
+            ? OrchestrationErrors.Agent.InvalidToken
+            : new AgentEnrollmentToken(id, organizationId, tokenHash, expiresAtUtc, agentId);
 
     /// <summary>True when the token can still be redeemed (not used, not expired).</summary>
     public bool IsRedeemable(DateTimeOffset now) => UsedAtUtc is null && ExpiresAtUtc > now;

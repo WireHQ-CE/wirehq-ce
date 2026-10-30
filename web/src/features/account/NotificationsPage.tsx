@@ -66,7 +66,7 @@ export function NotificationsPage() {
                   <div key={row.key} className="flex items-start justify-between gap-4">
                     <div>
                       <div className="text-sm font-medium text-ink-800 dark:text-ink-100">{row.label}</div>
-                      <p className="mt-0.5 text-xs text-ink-400">{row.hint}</p>
+                      <p className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">{row.hint}</p>
                     </div>
                     <Toggle checked={prefs[row.key]} onChange={(v) => set(row.key, v)} aria-label={row.label} />
                   </div>
@@ -163,7 +163,7 @@ function SmsSection({
     <Card>
       <CardContent>
         <h2 className="mb-1 text-sm font-semibold text-ink-800 dark:text-ink-100">SMS alerts</h2>
-        <p className="mb-4 text-xs text-ink-400">
+        <p className="mb-4 text-xs text-ink-500 dark:text-ink-400">
           Get critical security and status alerts by text message. Verify a mobile number, then opt in below.
         </p>
 
@@ -241,7 +241,7 @@ function SmsSection({
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="text-sm font-medium text-ink-800 dark:text-ink-100">Send me SMS alerts</div>
-                  <p className="mt-0.5 text-xs text-ink-400">Critical alerts only, for your current organization. Reply STOP at any time to opt out.</p>
+                  <p className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">Critical alerts only, for your current organization. Reply STOP at any time to opt out.</p>
                 </div>
                 <Toggle
                   checked={smsAlerts}

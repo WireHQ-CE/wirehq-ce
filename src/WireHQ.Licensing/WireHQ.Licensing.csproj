@@ -12,7 +12,7 @@
     security rests entirely on the Ed25519 private key, never on this code being private.
   -->
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>WireHQ.Licensing</RootNamespace>
   </PropertyGroup>
 

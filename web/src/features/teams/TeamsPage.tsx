@@ -39,7 +39,7 @@ export function TeamsPage() {
         <div className="overflow-hidden rounded-lg border bg-ink-0 dark:border-ink-800 dark:bg-ink-900">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:border-ink-800">
+              <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:text-ink-400 dark:border-ink-800">
                 <th className="px-5 py-3 font-medium">Team</th>
                 <th className="px-5 py-3 font-medium">Members</th>
                 <th className="px-5 py-3 font-medium">Created</th>
@@ -55,7 +55,7 @@ export function TeamsPage() {
       )}
 
       {data && data.length > 0 && (
-        <p className="mt-3 text-sm text-ink-400">{data.length} team{data.length === 1 ? '' : 's'}</p>
+        <p className="mt-3 text-sm text-ink-500 dark:text-ink-400">{data.length} team{data.length === 1 ? '' : 's'}</p>
       )}
 
       {creating && <CreateTeamDialog onClose={() => setCreating(false)} />}
@@ -72,11 +72,11 @@ function TeamRow({ team }: { team: TeamListItem }) {
     >
       <td className="px-5 py-3">
         <div className="font-medium text-ink-800 dark:text-ink-100">{team.name}</div>
-        <div className="font-mono text-xs text-ink-400">{team.slug}</div>
-        {team.description && <div className="mt-0.5 text-xs text-ink-500">{team.description}</div>}
+        <div className="font-mono text-xs text-ink-500 dark:text-ink-400">{team.slug}</div>
+        {team.description && <div className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">{team.description}</div>}
       </td>
-      <td className="px-5 py-3 text-ink-500">{team.memberCount}</td>
-      <td className="px-5 py-3 text-ink-400">{new Date(team.createdAtUtc).toLocaleDateString()}</td>
+      <td className="px-5 py-3 text-ink-500 dark:text-ink-400">{team.memberCount}</td>
+      <td className="px-5 py-3 text-ink-500 dark:text-ink-400">{new Date(team.createdAtUtc).toLocaleDateString()}</td>
     </tr>
   );
 }

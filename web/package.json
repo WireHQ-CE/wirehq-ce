@@ -1,6 +1,6 @@
 {
   "name": "wirehq-web",
-  "version": "0.92.1",
+  "version": "0.93.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -24,8 +24,8 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.41.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "react-router-dom": "^6.27.0",
     "swagger-ui-react": "5.32.15",
     "tailwind-merge": "^2.5.4",
@@ -35,8 +35,8 @@
   "devDependencies": {
     "@eslint/js": "^9.13.0",
     "@types/node": "^26.4.1",
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@types/swagger-ui-react": "^5.18.0",
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.5.5",

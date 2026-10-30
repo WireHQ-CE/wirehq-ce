@@ -45,7 +45,7 @@ export function FleetPanel() {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:border-ink-800">
+              <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:text-ink-400 dark:border-ink-800">
                 <th className="px-5 py-3 font-medium">Instance</th>
                 <th className="px-5 py-3 font-medium">Target</th>
                 <th className="px-5 py-3 font-medium">Status</th>
@@ -70,14 +70,14 @@ function FleetRow({ row }: { row: FleetInstance }) {
   return (
     <tr className="border-b last:border-0 hover:bg-ink-50 dark:border-ink-800 dark:hover:bg-ink-850">
       <td className="px-5 py-3">
-        <Link to={`/app/wireguard/instances/${row.instanceId}`} className="font-medium text-ink-800 hover:text-gold-700 dark:text-ink-100 dark:hover:text-gold-400">
+        <Link to={`/app/wireguard/instances/${row.instanceId}`} className="font-medium text-ink-800 hover:text-gold-800 dark:text-ink-100 dark:hover:text-gold-400">
           {row.name}
         </Link>
-        <div className="text-xs text-ink-400">{row.networkName ?? '—'}</div>
+        <div className="text-xs text-ink-500 dark:text-ink-400">{row.networkName ?? '—'}</div>
       </td>
       <td className="px-5 py-3">
         <span className="text-ink-700 dark:text-ink-200">{row.targetKind}</span>
-        {row.targetName && <span className="text-ink-400"> · {row.targetName}</span>}
+        {row.targetName && <span className="text-ink-500 dark:text-ink-400"> · {row.targetName}</span>}
       </td>
       <td className="px-5 py-3">
         <span className="flex items-center gap-2">
@@ -85,13 +85,13 @@ function FleetRow({ row }: { row: FleetInstance }) {
           {row.hasDrift && <Badge tone="warning" dot>Drift</Badge>}
         </span>
       </td>
-      <td className="px-5 py-3 tabular-nums text-ink-500">
-        {row.peersConnected}<span className="text-ink-400">/{row.peersTotal}</span>
+      <td className="px-5 py-3 tabular-nums text-ink-500 dark:text-ink-400">
+        {row.peersConnected}<span className="text-ink-500 dark:text-ink-400">/{row.peersTotal}</span>
       </td>
-      <td className="px-5 py-3 tabular-nums text-ink-500">
+      <td className="px-5 py-3 tabular-nums text-ink-500 dark:text-ink-400">
         {row.peersTotal === 0 ? '—' : `↓ ${formatBytes(row.rxBytes)} · ↑ ${formatBytes(row.txBytes)}`}
       </td>
-      <td className="px-5 py-3 text-ink-500" title={row.observedAtUtc ? new Date(row.observedAtUtc).toLocaleString() : ''}>
+      <td className="px-5 py-3 text-ink-500 dark:text-ink-400" title={row.observedAtUtc ? new Date(row.observedAtUtc).toLocaleString() : ''}>
         {row.observedAtUtc ? formatRelative(row.observedAtUtc) : '—'}
       </td>
     </tr>
@@ -101,12 +101,12 @@ function FleetRow({ row }: { row: FleetInstance }) {
 function FleetStat({ icon: Icon, label, value, tone }: { icon: typeof Server; label: string; value?: number | string; tone?: 'warning' }) {
   return (
     <Card className="flex items-center gap-3 p-4">
-      <div className={`grid size-9 place-items-center rounded-md ${tone === 'warning' ? 'bg-warning-500/10 text-warning-700 dark:text-warning-500' : 'bg-gold-400/10 text-gold-700 dark:text-gold-400'}`}>
+      <div className={`grid size-9 place-items-center rounded-md ${tone === 'warning' ? 'bg-warning-500/10 text-warning-700 dark:text-warning-500' : 'bg-gold-400/10 text-gold-800 dark:text-gold-400'}`}>
         <Icon className="size-5" />
       </div>
       <div>
         <div className="text-h3 tabular-nums text-ink-900 dark:text-ink-50">{value ?? '—'}</div>
-        <div className="text-xs text-ink-500">{label}</div>
+        <div className="text-xs text-ink-500 dark:text-ink-400">{label}</div>
       </div>
     </Card>
   );

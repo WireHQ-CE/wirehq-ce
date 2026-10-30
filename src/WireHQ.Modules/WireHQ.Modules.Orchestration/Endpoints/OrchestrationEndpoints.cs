@@ -115,6 +115,11 @@ public static class OrchestrationEndpoints
 
         agents.MapPost("/{id:guid}/revoke", async (Guid id, ISender sender, CancellationToken ct) =>
             (await sender.Send(new RevokeAgentCommand(id), ct)).ToHttpResult());
+
+        // Mint a single-use RE-KEY token for an existing agent: redeemed by the ordinary enroll command, it re-issues
+        // this agent's certificate so its identity + instance bindings survive (the expired-certificate recovery).
+        agents.MapPost("/{id:guid}/rekey-tokens", async (Guid id, MintEnrollTokenRequest? request, ISender sender, CancellationToken ct) =>
+            (await sender.Send(new MintRekeyTokenCommand(id, request?.TtlHours), ct)).ToHttpResult(StatusCodes.Status201Created));
     }
 }
 

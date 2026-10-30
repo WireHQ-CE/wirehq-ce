@@ -1,7 +1,7 @@
 # Build context is the repository root.
 
 # ---- build ----
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copy solution-wide build config first for better layer caching.
@@ -18,7 +18,7 @@ RUN dotnet publish src/WireHQ.Api/WireHQ.Api.csproj -c Release -o /app /p:UseApp
     ${WIREHQ_VERSION:+-p:Version=$WIREHQ_VERSION}
 
 # ---- runtime ----
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 COPY --from=build /app ./
 

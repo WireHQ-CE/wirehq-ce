@@ -107,7 +107,7 @@ export function WireGuardPage() {
             configs to your gateways over SSH or the outbound agent — are part of the{' '}
             <span className="font-medium text-ink-800 dark:text-ink-100">Remote Deployment</span> module.
           </span>
-          <Link to="/app/modules" className="shrink-0 text-gold-600 hover:underline dark:text-gold-400">
+          <Link to="/app/modules" className="shrink-0 text-gold-800 hover:underline dark:text-gold-400">
             View in Modules
           </Link>
         </div>
@@ -125,12 +125,12 @@ export function WireGuardPage() {
 function StatCard({ icon: Icon, label, value }: { icon: typeof Server; label: string; value?: number }) {
   return (
     <Card className="flex items-center gap-3 p-4">
-      <div className="grid size-9 place-items-center rounded-md bg-gold-400/10 text-gold-700 dark:text-gold-400">
+      <div className="grid size-9 place-items-center rounded-md bg-gold-400/10 text-gold-800 dark:text-gold-400">
         <Icon className="size-5" />
       </div>
       <div>
         <div className="text-h3 tabular-nums text-ink-900 dark:text-ink-50">{value ?? '—'}</div>
-        <div className="text-xs text-ink-500">{label}</div>
+        <div className="text-xs text-ink-500 dark:text-ink-400">{label}</div>
       </div>
     </Card>
   );
@@ -165,7 +165,7 @@ function InstancesTab({ canManage }: { canManage: boolean }) {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:border-ink-800">
+              <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:text-ink-400 dark:border-ink-800">
                 <th className="px-5 py-3 font-medium">Name</th>
                 <th className="px-5 py-3 font-medium">Address</th>
                 <th className="px-5 py-3 font-medium">Port</th>
@@ -177,15 +177,15 @@ function InstancesTab({ canManage }: { canManage: boolean }) {
               {data.map((i) => (
                 <tr key={i.id} className="border-b last:border-0 hover:bg-ink-50 dark:border-ink-800 dark:hover:bg-ink-850">
                   <td className="px-5 py-3">
-                    <Link to={`/app/wireguard/instances/${i.id}`} className="font-medium text-ink-800 hover:text-gold-700 dark:text-ink-100 dark:hover:text-gold-400">
+                    <Link to={`/app/wireguard/instances/${i.id}`} className="font-medium text-ink-800 hover:text-gold-800 dark:text-ink-100 dark:hover:text-gold-400">
                       {i.name}
                     </Link>
-                    <div className="text-xs text-ink-400">{i.slug} · {i.providerType}</div>
+                    <div className="text-xs text-ink-500 dark:text-ink-400">{i.slug} · {i.providerType}</div>
                   </td>
-                  <td className="px-5 py-3 font-mono text-ink-500">{i.interfaceAddress}</td>
-                  <td className="px-5 py-3 tabular-nums text-ink-500">{i.listenPort}</td>
+                  <td className="px-5 py-3 font-mono text-ink-500 dark:text-ink-400">{i.interfaceAddress}</td>
+                  <td className="px-5 py-3 tabular-nums text-ink-500 dark:text-ink-400">{i.listenPort}</td>
                   <td className="px-5 py-3"><Badge tone={instanceTone[i.status] ?? 'neutral'} dot>{i.status}</Badge></td>
-                  <td className="px-5 py-3 tabular-nums text-ink-500">{i.peerCount}</td>
+                  <td className="px-5 py-3 tabular-nums text-ink-500 dark:text-ink-400">{i.peerCount}</td>
                 </tr>
               ))}
             </tbody>
@@ -250,7 +250,7 @@ function CreateInstanceDialog({ onClose }: { onClose: () => void }) {
       }
     >
       {noNetworks ? (
-        <p className="text-sm text-ink-500">Create a network first — instances allocate peer addresses from a network's CIDR.</p>
+        <p className="text-sm text-ink-500 dark:text-ink-400">Create a network first — instances allocate peer addresses from a network's CIDR.</p>
       ) : (
         <form id="create-instance" onSubmit={submit} className="space-y-4">
           <Field label="Network" htmlFor="net" error={errors.fields.networkId}>
@@ -307,7 +307,7 @@ function NetworksTab({ canManage }: { canManage: boolean }) {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:border-ink-800">
+              <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:text-ink-400 dark:border-ink-800">
                 <th className="px-5 py-3 font-medium">Name</th>
                 <th className="px-5 py-3 font-medium">CIDR</th>
                 <th className="px-5 py-3 font-medium">Instances</th>
@@ -343,12 +343,12 @@ function NetworkRow({ network, canManage }: { network: NetworkListItem; canManag
   return (
     <tr className="border-b last:border-0 hover:bg-ink-50 dark:border-ink-800 dark:hover:bg-ink-850">
       <td className="px-5 py-3 font-medium text-ink-800 dark:text-ink-100">{network.name}</td>
-      <td className="px-5 py-3 font-mono text-ink-500">{network.cidr}</td>
-      <td className="px-5 py-3 tabular-nums text-ink-500">{network.instanceCount}</td>
+      <td className="px-5 py-3 font-mono text-ink-500 dark:text-ink-400">{network.cidr}</td>
+      <td className="px-5 py-3 tabular-nums text-ink-500 dark:text-ink-400">{network.instanceCount}</td>
       <td className="px-5 py-3 text-right">
         {canManage && (
           <Button variant="ghost" size="icon" onClick={remove} disabled={del.isPending} aria-label="Delete network">
-            <Trash2 className="text-ink-400" />
+            <Trash2 className="text-ink-500 dark:text-ink-400" />
           </Button>
         )}
       </td>

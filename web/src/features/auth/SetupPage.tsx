@@ -104,14 +104,14 @@ export function SetupPage() {
         </Field>
         <Field label="Organization name" htmlFor="organizationName" error={errors.organizationName?.[0]}>
           <Input id="organizationName" placeholder="WireHQ" value={form.organizationName} onChange={set('organizationName')} />
-          <p className="text-xs text-ink-400">Shown across the app — you can change it later in Settings.</p>
+          <p className="text-xs text-ink-500 dark:text-ink-400">Shown across the app — you can change it later in Settings.</p>
         </Field>
 
-        {error && <p className="text-sm text-danger-500">{error}</p>}
+        {error && <p className="text-sm text-danger-700 dark:text-danger-500">{error}</p>}
         <Button type="submit" className="w-full" disabled={submitting}>
           {submitting ? 'Setting up…' : 'Create owner account'}
         </Button>
-        <p className="text-xs text-ink-400">
+        <p className="text-xs text-ink-500 dark:text-ink-400">
           This one-time setup creates the instance owner. Once created, this page locks itself — more
           users are added by invitation.
         </p>

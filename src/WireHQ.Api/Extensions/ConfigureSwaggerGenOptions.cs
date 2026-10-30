@@ -1,7 +1,7 @@
 using System.Text.RegularExpressions;
 using Asp.Versioning.ApiExplorer;
 using Microsoft.Extensions.Options;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace WireHQ.Api.Extensions;
@@ -60,7 +60,6 @@ public sealed class ConfigureSwaggerGenOptions(IApiVersionDescriptionProvider pr
             BearerFormat = "JWT",
             In = ParameterLocation.Header,
             Description = "A user-session access token from `POST /api/v1/auth/login`.",
-            Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" },
         };
         var apiKey = new OpenApiSecurityScheme
         {
@@ -68,15 +67,17 @@ public sealed class ConfigureSwaggerGenOptions(IApiVersionDescriptionProvider pr
             Type = SecuritySchemeType.ApiKey,
             In = ParameterLocation.Header,
             Description = "A scoped organization API key (`whq_…`) from Settings → API keys.",
-            Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "ApiKey" },
         };
 
         options.AddSecurityDefinition("Bearer", bearer);
         options.AddSecurityDefinition("ApiKey", apiKey);
         // Two separate requirements = either scheme satisfies an endpoint (OR, matching the smart
         // JWT-or-API-key runtime scheme) — one requirement listing both would mean AND.
-        options.AddSecurityRequirement(new OpenApiSecurityRequirement { [bearer] = [] });
-        options.AddSecurityRequirement(new OpenApiSecurityRequirement { [apiKey] = [] });
+        // Microsoft.OpenApi v2: a requirement keys on a *reference* to the scheme, resolved against the document.
+        options.AddSecurityRequirement(document =>
+            new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference("Bearer", document)] = [] });
+        options.AddSecurityRequirement(document =>
+            new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference("ApiKey", document)] = [] });
 
         // The Application XML lands in the Api output because documentation files flow with project
         // references; guard anyway so a build shape change degrades the docs, not the boot.
@@ -112,14 +113,14 @@ public sealed partial class InternalDocReferenceFilter : IDocumentFilter
 
     public void Apply(OpenApiDocument document, DocumentFilterContext context)
     {
-        foreach (var tag in document.Tags ?? [])
+        foreach (var tag in document.Tags ?? new HashSet<OpenApiTag>())
         {
             tag.Description = Scrub(tag.Description);
         }
 
         foreach (var path in document.Paths.Values)
         {
-            foreach (var operation in path.Operations.Values)
+            foreach (var operation in path.Operations?.Values ?? Enumerable.Empty<OpenApiOperation>())
             {
                 operation.Summary = Scrub(operation.Summary);
                 operation.Description = Scrub(operation.Description);
@@ -133,17 +134,14 @@ public sealed partial class InternalDocReferenceFilter : IDocumentFilter
                     requestBody.Description = Scrub(requestBody.Description);
                 }
 
-                if (operation.Responses is { } responses)
+                foreach (var response in operation.Responses?.Values ?? Enumerable.Empty<IOpenApiResponse>())
                 {
-                    foreach (var response in responses.Values)
-                    {
-                        response.Description = Scrub(response.Description);
-                    }
+                    response.Description = Scrub(response.Description);
                 }
             }
         }
 
-        foreach (var schema in document.Components?.Schemas.Values ?? [])
+        foreach (var schema in document.Components?.Schemas?.Values ?? [])
         {
             schema.Description = Scrub(schema.Description);
             foreach (var property in schema.Properties?.Values ?? [])

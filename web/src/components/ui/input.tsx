@@ -32,7 +32,7 @@ export function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <label htmlFor={htmlFor} className="text-xs font-medium uppercase tracking-wide text-ink-500">
+      <label htmlFor={htmlFor} className="text-xs font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
         {label}
       </label>
       {children}

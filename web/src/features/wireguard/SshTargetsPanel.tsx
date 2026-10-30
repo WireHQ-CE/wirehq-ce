@@ -47,7 +47,7 @@ export function SshTargetsPanel({ canManage }: { canManage: boolean }) {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:border-ink-800">
+              <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:text-ink-400 dark:border-ink-800">
                 <th className="px-5 py-3 font-medium">Name</th>
                 <th className="px-5 py-3 font-medium">Host</th>
                 <th className="px-5 py-3 font-medium">Auth</th>
@@ -106,8 +106,8 @@ function TargetRow({ target, canManage, onEdit }: { target: SshTarget; canManage
   return (
     <tr className="border-b last:border-0 hover:bg-ink-50 dark:border-ink-800 dark:hover:bg-ink-850">
       <td className="px-5 py-3 font-medium text-ink-800 dark:text-ink-100">{target.name}</td>
-      <td className="px-5 py-3 font-mono text-ink-500">{target.username}@{target.host}:{target.port}</td>
-      <td className="px-5 py-3 text-ink-500">{target.authKind === 'PrivateKey' ? 'Key' : 'Password'}</td>
+      <td className="px-5 py-3 font-mono text-ink-500 dark:text-ink-400">{target.username}@{target.host}:{target.port}</td>
+      <td className="px-5 py-3 text-ink-500 dark:text-ink-400">{target.authKind === 'PrivateKey' ? 'Key' : 'Password'}</td>
       <td className="px-5 py-3">
         {target.hostKeyFingerprint
           ? <Badge tone="success" dot>Pinned</Badge>
@@ -120,8 +120,8 @@ function TargetRow({ target, canManage, onEdit }: { target: SshTarget; canManage
               <Button variant="ghost" size="sm" onClick={runTest} disabled={test.isPending} title="Test connection">
                 <Plug /> {test.isPending ? 'Testing…' : 'Test'}
               </Button>
-              <Button variant="ghost" size="icon" onClick={onEdit} aria-label="Edit" title="Edit"><Pencil className="text-ink-400" /></Button>
-              <Button variant="ghost" size="icon" onClick={remove} disabled={del.isPending} aria-label="Delete" title="Delete"><Trash2 className="text-ink-400" /></Button>
+              <Button variant="ghost" size="icon" onClick={onEdit} aria-label="Edit" title="Edit"><Pencil className="text-ink-500 dark:text-ink-400" /></Button>
+              <Button variant="ghost" size="icon" onClick={remove} disabled={del.isPending} aria-label="Delete" title="Delete"><Trash2 className="text-ink-500 dark:text-ink-400" /></Button>
             </>
           )}
         </div>

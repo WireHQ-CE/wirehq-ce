@@ -26,8 +26,7 @@ public sealed partial class WireHqApiFactory : WebApplicationFactory<Program>, I
     /// canonical URL = this base + the request path.</summary>
     public const string SmsInboundTestBaseUrl = "https://sms.wirehq.test";
 
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .WithDatabase("wirehq")
         .WithUsername("wirehq")
         .WithPassword("wirehq")

@@ -32,6 +32,7 @@ public static class OrchestrationErrors
         public static readonly Error InvalidCertificate = Error.Validation("orch.agent.invalid_certificate", "A valid agent certificate is required.");
         public static readonly Error InvalidToken = Error.Validation("orch.agent.invalid_token", "An enrollment token is required.");
         public static readonly Error NotFound = Error.NotFound("orch.agent.not_found", "Agent was not found.");
+        public static readonly Error RekeyNotAllowed = Error.Conflict("orch.agent.rekey_not_allowed", "A revoked agent cannot be re-keyed — enrol a new agent instead.");
 
         /// <summary>Returned by the gateway enrol endpoint — kept generic so it leaks nothing about which check failed.</summary>
         public static readonly Error EnrollmentRejected = Error.Unauthorized("orch.agent.enrollment_rejected", "Enrollment was rejected: the token is invalid, expired, or already used.");

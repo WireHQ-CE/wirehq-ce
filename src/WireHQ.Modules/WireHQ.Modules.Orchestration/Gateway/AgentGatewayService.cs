@@ -93,7 +93,11 @@ public sealed class AgentGatewayService(
     /// <summary>Guards against an abusive batch — extra events past this are dropped.</summary>
     private const int MaxDiagnosticEvents = 200;
 
-    /// <summary>Redeems a single-use token + a CSR into a signed client cert, creating the agent. Pre-cert.</summary>
+    /// <summary>
+    /// Redeems a single-use token + a CSR into a signed client cert. Pre-cert. An ordinary token creates a new agent;
+    /// a re-key token (<see cref="AgentEnrollmentToken.RekeyAgentId"/>) re-issues the certificate of the agent it was
+    /// minted for, keeping its id and every instance binding (docs/13 §6.2).
+    /// </summary>
     public async Task<Result<EnrollAgentResponse>> EnrollAsync(EnrollAgentRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Token) || string.IsNullOrWhiteSpace(request.Csr))
@@ -107,6 +111,7 @@ public sealed class AgentGatewayService(
         // Find the token's org cross-tenant in a throwaway bypass scope (the request scope stays un-bypassed).
         Guid organizationId;
         Guid tokenId;
+        Guid? rekeyAgentId;
         using (var lookupScope = scopeFactory.CreateScope())
         {
             lookupScope.ServiceProvider.GetRequiredService<ISettableTenantContext>().SetBypass();
@@ -122,6 +127,7 @@ public sealed class AgentGatewayService(
 
             organizationId = token.OrganizationId;
             tokenId = token.Id;
+            rekeyAgentId = token.RekeyAgentId;
         }
 
         // Scope the unit of work to the token's org, then BURN the token atomically (single-use under
@@ -134,6 +140,11 @@ public sealed class AgentGatewayService(
         if (burned != 1)
         {
             return OrchestrationErrors.Agent.EnrollmentRejected;
+        }
+
+        if (rekeyAgentId is { } existingAgentId)
+        {
+            return await RekeyAsync(organizationId, existingAgentId, tokenId, request, cancellationToken);
         }
 
         var agentId = Guid.CreateVersion7();
@@ -154,6 +165,40 @@ public sealed class AgentGatewayService(
         dbContext.Set<Agent>().Add(agentResult.Value);
         audit.Record("orch.agent.enrolled", AuditOutcome.Success, nameof(Agent), agentId.ToString(),
             new { name, request.Platform });
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return new EnrollAgentResponse(agentId, issued.Value.CertificatePem, issued.Value.CaCertificatePem, issued.Value.NotAfterUtc);
+    }
+
+    /// <summary>
+    /// The re-key branch of <see cref="EnrollAsync"/>, after the token is burned. The agent is looked up in the token's
+    /// org (tenant already set), so a re-key token can only ever re-key an agent of the org that minted it. The new
+    /// certificate replaces every previous one at once (<see cref="Agent.Rekey"/>). A revoked or deleted agent is
+    /// refused with the same generic rejection as a bad token, giving the anonymous caller nothing to probe.
+    /// </summary>
+    private async Task<Result<EnrollAgentResponse>> RekeyAsync(
+        Guid organizationId, Guid agentId, Guid tokenId, EnrollAgentRequest request, CancellationToken cancellationToken)
+    {
+        var agent = await dbContext.Set<Agent>().FirstOrDefaultAsync(a => a.Id == agentId, cancellationToken);
+        if (agent is null || agent.Status == AgentStatus.Revoked)
+        {
+            return OrchestrationErrors.Agent.EnrollmentRejected;
+        }
+
+        var issued = await certificateAuthority.IssueClientCertificateAsync(organizationId, agentId, request.Csr, cancellationToken);
+        if (issued.IsFailure)
+        {
+            return issued.Error;
+        }
+
+        var rekeyed = agent.Rekey(issued.Value.Sha256Fingerprint, issued.Value.CertificatePem);
+        if (rekeyed.IsFailure)
+        {
+            return OrchestrationErrors.Agent.EnrollmentRejected;
+        }
+
+        audit.Record("orch.agent.rekeyed", AuditOutcome.Success, nameof(Agent), agentId.ToString(),
+            new { tokenId, notAfterUtc = issued.Value.NotAfterUtc, request.Platform });
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return new EnrollAgentResponse(agentId, issued.Value.CertificatePem, issued.Value.CaCertificatePem, issued.Value.NotAfterUtc);

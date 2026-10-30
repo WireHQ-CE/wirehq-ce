@@ -131,6 +131,29 @@ public sealed class Agent : AggregateRoot, ITenantOwned, IAuditable, ISoftDeleta
         }
     }
 
+    /// <summary>
+    /// Re-keys the agent through a re-key token: the new certificate replaces the current one outright and any
+    /// rotation grace is dropped, so every certificate the agent held before stops working at once. That is what
+    /// makes re-keying safe after a suspected compromise, not just after an expiry. A revoked agent is never re-keyed.
+    /// </summary>
+    public Result Rekey(string certificateFingerprint, string certificatePem)
+    {
+        if (Status == AgentStatus.Revoked || IsDeleted)
+        {
+            return OrchestrationErrors.Agent.RekeyNotAllowed;
+        }
+
+        if (string.IsNullOrWhiteSpace(certificateFingerprint) || string.IsNullOrWhiteSpace(certificatePem))
+        {
+            return OrchestrationErrors.Agent.InvalidCertificate;
+        }
+
+        CertificateFingerprint = certificateFingerprint;
+        CertificatePem = certificatePem;
+        PreviousCertificateFingerprint = null;
+        return Result.Success();
+    }
+
     public void Disable() => Status = AgentStatus.Disabled;
 
     public void Reactivate()

@@ -18,7 +18,7 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("core")
-                .HasAnnotation("ProductVersion", "9.0.0")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -2492,6 +2492,10 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
+
+                    b.Property<Guid?>("RekeyAgentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rekey_agent_id");
 
                     b.Property<string>("TokenHash")
                         .IsRequired()

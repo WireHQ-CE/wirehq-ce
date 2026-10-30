@@ -37,20 +37,20 @@ export function TeamDetailPage() {
   }
 
   if (!team) {
-    return <p className="text-ink-500">Team not found.</p>;
+    return <p className="text-ink-500 dark:text-ink-400">Team not found.</p>;
   }
 
   return (
     <div className="space-y-6">
-      <Link to="/app/teams" className="inline-flex items-center gap-1.5 text-sm text-ink-500 hover:text-ink-800 dark:hover:text-ink-200">
+      <Link to="/app/teams" className="inline-flex items-center gap-1.5 text-sm text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-ink-200">
         <ArrowLeft className="size-4" /> Teams
       </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-h1 text-ink-900 dark:text-ink-50">{team.name}</h1>
-          <p className="mt-1 font-mono text-sm text-ink-400">{team.slug}</p>
-          {team.description && <p className="mt-2 max-w-prose text-sm text-ink-500">{team.description}</p>}
+          <p className="mt-1 font-mono text-sm text-ink-500 dark:text-ink-400">{team.slug}</p>
+          {team.description && <p className="mt-2 max-w-prose text-sm text-ink-500 dark:text-ink-400">{team.description}</p>}
         </div>
         {canManage && (
           <div className="flex flex-wrap items-center gap-2">
@@ -92,7 +92,7 @@ function TeamMembers({ team, canManage }: { team: TeamDetail; canManage: boolean
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:border-ink-800">
+              <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:text-ink-400 dark:border-ink-800">
                 <th className="px-2 py-2 font-medium">Name</th>
                 <th className="px-2 py-2 font-medium">Status</th>
                 <th className="px-2 py-2 font-medium">Added</th>
@@ -104,10 +104,10 @@ function TeamMembers({ team, canManage }: { team: TeamDetail; canManage: boolean
                 <tr key={m.membershipId} className="border-b last:border-0 dark:border-ink-800">
                   <td className="px-2 py-2">
                     <div className="font-medium text-ink-800 dark:text-ink-100">{m.name}</div>
-                    <div className="text-xs text-ink-400">{m.email}</div>
+                    <div className="text-xs text-ink-500 dark:text-ink-400">{m.email}</div>
                   </td>
                   <td className="px-2 py-2"><Badge tone={m.status === 'Active' ? 'success' : 'neutral'} dot>{m.status}</Badge></td>
-                  <td className="px-2 py-2 text-ink-400">{new Date(m.addedAtUtc).toLocaleDateString()}</td>
+                  <td className="px-2 py-2 text-ink-500 dark:text-ink-400">{new Date(m.addedAtUtc).toLocaleDateString()}</td>
                   {canManage && (
                     <td className="px-2 py-2 text-right">
                       <Button variant="ghost" size="sm" onClick={() => removeMember(m.membershipId, m.name)} disabled={remove.isPending}>
@@ -129,7 +129,7 @@ function TeamMembers({ team, canManage }: { team: TeamDetail; canManage: boolean
 
 function EmptyMembers() {
   return (
-    <div className="flex items-center gap-2 py-2 text-sm text-ink-400">
+    <div className="flex items-center gap-2 py-2 text-sm text-ink-500 dark:text-ink-400">
       <Users2 className="size-4" /> No members yet.
     </div>
   );

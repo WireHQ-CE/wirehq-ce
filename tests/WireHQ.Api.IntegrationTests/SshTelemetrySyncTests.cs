@@ -33,10 +33,9 @@ public sealed class SshTelemetrySyncTests(WireHqApiFactory factory) : IAsyncLife
             .Build();
         await _image.CreateAsync();
 
-        _host = new ContainerBuilder()
-            .WithImage(_image)
+        _host = new ContainerBuilder(_image)
             .WithPortBinding(22, assignRandomHostPort: true)
-            .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(22))
+            .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(22))
             .Build();
         await _host.StartAsync();
     }

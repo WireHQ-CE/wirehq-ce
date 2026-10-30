@@ -70,7 +70,7 @@ export function RegisterPage() {
           </>
         }
       >
-        <p className="text-sm text-ink-300">
+        <p className="text-sm text-ink-700 dark:text-ink-300">
           Self-serve signup is disabled on this instance. Ask an administrator to invite you — you'll
           receive an email with a link to set your password.
         </p>
@@ -108,7 +108,7 @@ export function RegisterPage() {
           <PasswordStrength password={form.password} />
         </Field>
 
-        <label className="flex items-start gap-2.5 text-sm text-ink-300">
+        <label className="flex items-start gap-2.5 text-sm text-ink-700 dark:text-ink-300">
           <input
             type="checkbox"
             checked={acceptTerms}
@@ -122,10 +122,10 @@ export function RegisterPage() {
             <Link to="/cookie-policy" target="_blank" className="text-gold-400 hover:underline">Cookie Policy</Link>.
           </span>
         </label>
-        {errors.acceptTerms?.[0] && <p className="text-sm text-danger-500">{errors.acceptTerms[0]}</p>}
+        {errors.acceptTerms?.[0] && <p className="text-sm text-danger-700 dark:text-danger-500">{errors.acceptTerms[0]}</p>}
 
         {captcha.widget}
-        {error && <p className="text-sm text-danger-500">{error}</p>}
+        {error && <p className="text-sm text-danger-700 dark:text-danger-500">{error}</p>}
         <Button type="submit" className="w-full" disabled={submitting || !acceptTerms || (captcha.required && !captcha.token)}>
           {submitting ? 'Creating account…' : 'Create account'}
         </Button>

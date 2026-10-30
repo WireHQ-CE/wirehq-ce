@@ -29,10 +29,10 @@ export function ErrorFallback({
       <div className="w-full max-w-md text-center">
         {fullScreen && <Mark className="mx-auto mb-6 h-8 w-auto" />}
         <div className="mx-auto mb-4 grid size-12 place-items-center rounded-full bg-danger-500/10">
-          <AlertTriangle className="size-6 text-danger-600" />
+          <AlertTriangle className="size-6 text-danger-700 dark:text-danger-500" />
         </div>
         <h1 className="text-h2 text-ink-900 dark:text-ink-50">Something went wrong</h1>
-        <p className="mt-2 text-base text-ink-500">
+        <p className="mt-2 text-base text-ink-500 dark:text-ink-400">
           An unexpected error occurred. Try again — if it keeps happening, contact support and quote the
           reference below.
         </p>
@@ -61,7 +61,7 @@ function ReferenceChip({ reference }: { reference: string }) {
         setTimeout(() => setCopied(false), 1500);
       }}
       title="Copy this reference for support"
-      className="mx-auto mt-4 flex max-w-full items-center gap-2 rounded-md border border-ink-200 bg-ink-0 px-3 py-1.5 font-mono text-xs text-ink-500 transition-colors hover:text-ink-700 dark:border-ink-700 dark:bg-ink-850 dark:hover:text-ink-200"
+      className="mx-auto mt-4 flex max-w-full items-center gap-2 rounded-md border border-ink-200 bg-ink-0 px-3 py-1.5 font-mono text-xs text-ink-500 dark:text-ink-400 transition-colors hover:text-ink-700 dark:border-ink-700 dark:bg-ink-850 dark:hover:text-ink-200"
     >
       <Copy className="size-3.5 shrink-0" />
       <span className="truncate">{copied ? 'Copied to clipboard' : reference}</span>

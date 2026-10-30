@@ -54,7 +54,7 @@ export function UsersPage() {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:border-ink-800">
+              <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:text-ink-400 dark:border-ink-800">
                 <th className="px-5 py-3 font-medium">Name</th>
                 <th className="px-5 py-3 font-medium">Email</th>
                 <th className="px-5 py-3 font-medium">Status</th>
@@ -65,13 +65,13 @@ export function UsersPage() {
               {data.items.map((u) => (
                 <tr key={u.membershipId} className="border-b last:border-0 hover:bg-ink-50 dark:border-ink-800 dark:hover:bg-ink-850">
                   <td className="px-5 py-3 font-medium text-ink-800 dark:text-ink-100">{u.name}</td>
-                  <td className="px-5 py-3 font-mono text-ink-500">{u.email}</td>
+                  <td className="px-5 py-3 font-mono text-ink-500 dark:text-ink-400">{u.email}</td>
                   <td className="px-5 py-3">
                     <Badge tone={statusTone[u.status] ?? 'neutral'} dot>
                       {u.status}
                     </Badge>
                   </td>
-                  <td className="px-5 py-3 tabular text-ink-500">
+                  <td className="px-5 py-3 tabular text-ink-500 dark:text-ink-400">
                     {u.joinedAtUtc ? new Date(u.joinedAtUtc).toLocaleDateString() : '—'}
                   </td>
                 </tr>
@@ -82,7 +82,7 @@ export function UsersPage() {
       </Card>
 
       {data && data.total > 0 && (
-        <p className="mt-3 text-sm text-ink-400">{data.total} member{data.total === 1 ? '' : 's'}</p>
+        <p className="mt-3 text-sm text-ink-500 dark:text-ink-400">{data.total} member{data.total === 1 ? '' : 's'}</p>
       )}
     </>
   );

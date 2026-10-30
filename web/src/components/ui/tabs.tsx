@@ -29,12 +29,12 @@ export function Tabs<T extends string>({
               ? 'cursor-not-allowed border-transparent text-ink-300 dark:text-ink-600'
               : value === t.value
                 ? 'border-gold-500 text-ink-900 dark:text-ink-50'
-                : 'border-transparent text-ink-500 hover:text-ink-800 dark:hover:text-ink-200',
+                : 'border-transparent text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-ink-200',
           )}
         >
           {t.label}
           {t.count !== undefined && (
-            <span className="rounded-full bg-ink-100 px-1.5 text-xs text-ink-500 dark:bg-ink-800">
+            <span className="rounded-full bg-ink-100 px-1.5 text-xs text-ink-500 dark:text-ink-400 dark:bg-ink-800">
               {t.count}
             </span>
           )}

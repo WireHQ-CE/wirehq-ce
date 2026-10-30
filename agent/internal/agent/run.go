@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -12,7 +13,7 @@ import (
 )
 
 // Version is reported on heartbeat. Bumped per agent release.
-const Version = "0.2.0"
+const Version = "0.3.0"
 
 // Loop is the agent's main cycle: renew the client cert when due, heartbeat, drain signed jobs (verify → apply →
 // report), push telemetry.
@@ -66,6 +67,7 @@ func (l *Loop) Run(ctx context.Context, interval time.Duration) error {
 func (l *Loop) Once(ctx context.Context) { l.tick(ctx) }
 
 func (l *Loop) tick(ctx context.Context) {
+	l.adoptReplacedIdentity()
 	l.maybeRotate(ctx, time.Now())
 
 	if err := l.client.Heartbeat(ctx, Version); err != nil {
@@ -87,6 +89,28 @@ func (l *Loop) tick(ctx context.Context) {
 	l.reportStatus(ctx)
 }
 
+// adoptReplacedIdentity picks up an identity written to disk by another process: an operator re-key
+// (`wirehq-agent enroll --token <re-key token>` run while this service is up). A re-key invalidates the certificate this
+// process holds in memory, so without this the service would keep failing until someone restarted it. Only a
+// complete, loadable key + cert pair that differs from the current one is adopted; a half-written pair is ignored
+// until the next poll.
+func (l *Loop) adoptReplacedIdentity() {
+	pair, err := tls.LoadX509KeyPair(l.cfg.certPath(), l.cfg.keyPath())
+	if err != nil {
+		return
+	}
+	if current := l.client.Leaf(); current != nil && bytes.Equal(pair.Certificate[0], current.Raw) {
+		return
+	}
+	l.client.useCertificate(pair)
+	if caPEM, err := os.ReadFile(l.cfg.caPath()); err == nil {
+		l.caCert = caPEM
+	}
+	l.nextRotateAttempt = time.Time{}
+	log.Printf("adopted a re-keyed client certificate from %s (valid until %s)",
+		l.cfg.StateDir, l.client.Leaf().NotAfter.UTC().Format(time.RFC3339))
+}
+
 // maybeRotate renews the client certificate once it is due (rotationDue). An already-expired certificate cannot
 // be renewed — the gateway rejects it outright — so that case only logs how to recover.
 func (l *Loop) maybeRotate(ctx context.Context, now time.Time) {
@@ -95,8 +119,9 @@ func (l *Loop) maybeRotate(ctx context.Context, now time.Time) {
 	}
 	leaf := l.client.Leaf()
 	if now.After(leaf.NotAfter) {
-		log.Printf("client certificate EXPIRED at %s: this agent can no longer authenticate. Re-enroll it: mint a token "+
-			"in WireHQ (WireGuard → Agents → Enroll agent) and run `wirehq-agent enroll --server %s --token <token>`",
+		log.Printf("client certificate EXPIRED at %s: this agent can no longer authenticate. Restore it with its "+
+			"instances intact: in WireHQ use WireGuard → Agents → Re-key on this agent, then run "+
+			"`wirehq-agent enroll --server %s --token <token>` here WITHOUT deleting the state directory",
 			leaf.NotAfter.UTC().Format(time.RFC3339), l.cfg.Server)
 		l.nextRotateAttempt = now.Add(rotateRetryBackoff)
 		return

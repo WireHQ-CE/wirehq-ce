@@ -138,7 +138,7 @@ function VerifyEmailBanner() {
   }
 
   return (
-    <div className="flex items-center justify-center gap-3 bg-gold-400/15 px-4 py-1.5 text-sm text-gold-700 dark:text-gold-300">
+    <div className="flex items-center justify-center gap-3 bg-gold-400/15 px-4 py-1.5 text-sm text-gold-800 dark:text-gold-300">
       <MailWarning className="size-4" />
       <span>Please confirm your email address to secure your account.</span>
       <button
@@ -166,7 +166,7 @@ export function PageHeader({
     <div className="mb-6 flex items-start justify-between gap-4">
       <div>
         <h1 className="text-h1 text-ink-900 dark:text-ink-50">{title}</h1>
-        {subtitle && <p className="mt-1 text-base text-ink-500">{subtitle}</p>}
+        {subtitle && <p className="mt-1 text-base text-ink-500 dark:text-ink-400">{subtitle}</p>}
       </div>
       {action}
     </div>

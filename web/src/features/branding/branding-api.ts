@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api/client';
 
-// The operator branding console hooks (docs/34). Super-Admin read/write of the install-global brand + logo/favicon
-// uploads, over the authenticated /api/v1/branding endpoints. Invalidates the public brand config on every change so
+// The operator branding console hooks (docs/34). Read/write of the install-global brand + logo/favicon uploads, over
+// the authenticated /api/v1/branding endpoints (branding.manage permission + the branding.basic feature). Invalidates the public brand config on every change so
 // the shell re-applies the new brand immediately.
 
 export interface BrandingSettings {
@@ -19,10 +19,11 @@ export type BrandAssetKind = 'LogoLight' | 'LogoDark' | 'Favicon';
 const settingsKey = ['branding', 'settings'] as const;
 const publicKey = ['branding', 'config'] as const;
 
-export function useBrandingSettings() {
+export function useBrandingSettings(enabled: boolean) {
   return useQuery({
     queryKey: settingsKey,
     queryFn: () => api.get<BrandingSettings>('/api/v1/branding/settings'),
+    enabled,
   });
 }
 

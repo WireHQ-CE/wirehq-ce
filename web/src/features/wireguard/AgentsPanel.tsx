@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Ban, Cpu, Play, Plus, ShieldOff } from 'lucide-react';
+import { Ban, Cpu, KeyRound, Play, Plus, ShieldOff } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,7 @@ import {
   useAgents,
   useDisableAgent,
   useMintEnrollToken,
+  useMintRekeyToken,
   useReactivateAgent,
   useRevokeAgent,
 } from './api';
@@ -52,7 +53,7 @@ export function AgentsPanel({ canManage }: { canManage: boolean }) {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:border-ink-800">
+              <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:text-ink-400 dark:border-ink-800">
                 <th className="px-5 py-3 font-medium">Name</th>
                 <th className="px-5 py-3 font-medium">Status</th>
                 <th className="px-5 py-3 font-medium">Platform</th>
@@ -83,6 +84,7 @@ function AgentRow({ agent, canManage }: { agent: Agent; canManage: boolean }) {
   const reactivate = useReactivateAgent();
   const revoke = useRevokeAgent();
   const busy = disable.isPending || reactivate.isPending || revoke.isPending;
+  const [rekeying, setRekeying] = useState(false);
   const health = connectivity(agent);
   const cert = certificateHealth(agent);
 
@@ -98,14 +100,14 @@ function AgentRow({ agent, canManage }: { agent: Agent; canManage: boolean }) {
     <tr className="border-b last:border-0 hover:bg-ink-50 dark:border-ink-800 dark:hover:bg-ink-850">
       <td className="px-5 py-3">
         <div className="font-medium text-ink-800 dark:text-ink-100">{agent.name}</div>
-        <div className="font-mono text-xs text-ink-400">{agent.certificateFingerprint.slice(0, 16).toLowerCase()}…</div>
+        <div className="font-mono text-xs text-ink-500 dark:text-ink-400">{agent.certificateFingerprint.slice(0, 16).toLowerCase()}…</div>
       </td>
       <td className="px-5 py-3"><Badge tone={statusTone[agent.status]} dot>{agent.status}</Badge></td>
-      <td className="px-5 py-3 text-ink-500">{agent.platform ?? '—'}</td>
-      <td className="px-5 py-3 tabular-nums text-ink-500">{agent.version ?? '—'}</td>
+      <td className="px-5 py-3 text-ink-500 dark:text-ink-400">{agent.platform ?? '—'}</td>
+      <td className="px-5 py-3 tabular-nums text-ink-500 dark:text-ink-400">{agent.version ?? '—'}</td>
       <td className="px-5 py-3">
         {agent.managedInstances === 0 ? (
-          <span className="text-ink-400">—</span>
+          <span className="text-ink-500 dark:text-ink-400">—</span>
         ) : (
           <span className="flex items-center gap-2">
             <span className="tabular-nums text-ink-700 dark:text-ink-200">{agent.managedInstances}</span>
@@ -115,18 +117,21 @@ function AgentRow({ agent, canManage }: { agent: Agent; canManage: boolean }) {
           </span>
         )}
       </td>
-      <td className="px-5 py-3 text-ink-500" title={lastSeenTitle(agent)}>
+      <td className="px-5 py-3 text-ink-500 dark:text-ink-400" title={lastSeenTitle(agent)}>
         <span className="flex items-center gap-2">
           <span className={`inline-block size-2 shrink-0 rounded-full ${health.dotClass}`} aria-hidden />
           {agent.lastSeenAtUtc ? formatRelative(agent.lastSeenAtUtc) : 'never'}
         </span>
       </td>
-      <td className="px-5 py-3 text-ink-500" title={cert.title}>
+      <td className="px-5 py-3 text-ink-500 dark:text-ink-400" title={cert.title}>
         {cert.tone ? <Badge tone={cert.tone} dot>{cert.label}</Badge> : cert.label}
       </td>
       <td className="px-5 py-3">
         {canManage && agent.status !== 'Revoked' && (
           <div className="flex justify-end gap-1">
+            <Button variant="ghost" size="sm" onClick={() => setRekeying(true)} disabled={busy}>
+              <KeyRound className="size-3.5" /> Re-key
+            </Button>
             {agent.status === 'Disabled' ? (
               <Button variant="ghost" size="sm" onClick={() => run('Agent reactivated.', reactivate)} disabled={busy}>
                 <Play className="size-3.5" /> Reactivate
@@ -142,25 +147,38 @@ function AgentRow({ agent, canManage }: { agent: Agent; canManage: boolean }) {
               onClick={() => run('Agent revoked.', revoke, `Revoke "${agent.name}"? Its certificate is rejected permanently — it must re-enroll.`)}
               disabled={busy}
             >
-              <ShieldOff className="size-3.5 text-danger-600" /> Revoke
+              <ShieldOff className="size-3.5 text-danger-700 dark:text-danger-500" /> Revoke
             </Button>
           </div>
         )}
+        {rekeying && <MintTokenDialog rekeyAgent={agent} onClose={() => setRekeying(false)} />}
       </td>
     </tr>
   );
 }
 
-function MintTokenDialog({ onClose }: { onClose: () => void }) {
+/**
+ * Mints a single-use token and shows the install command once. Without `rekeyAgent` it enrols a NEW agent; with it,
+ * the same command re-issues that agent's certificate instead, so its identity and instance bindings survive (the
+ * recovery for an expired certificate) and its current certificate stops working on redemption.
+ */
+function MintTokenDialog({ onClose, rekeyAgent }: { onClose: () => void; rekeyAgent?: Agent }) {
   const toast = useToast();
-  const mint = useMintEnrollToken();
+  const enrol = useMintEnrollToken();
+  const rekey = useMintRekeyToken();
+  const mint = rekeyAgent ? rekey : enrol;
   const [result, setResult] = useState<MintEnrollTokenResult | null>(null);
 
   function generate() {
-    mint.mutate(undefined, {
+    const done = {
       onSuccess: setResult,
-      onError: (err) => toast(err instanceof ApiError ? err.message : 'Could not mint a token.', 'error'),
-    });
+      onError: (err: unknown) => toast(err instanceof ApiError ? err.message : 'Could not mint a token.', 'error'),
+    };
+    if (rekeyAgent) {
+      rekey.mutate(rekeyAgent.id, done);
+    } else {
+      enrol.mutate(undefined, done);
+    }
   }
 
   const installCommand = result
@@ -171,8 +189,12 @@ function MintTokenDialog({ onClose }: { onClose: () => void }) {
     <Dialog
       open
       onClose={onClose}
-      title="Enroll an agent"
-      description="Mint a single-use token, then run the install command on the host. The token is shown only once."
+      title={rekeyAgent ? `Re-key "${rekeyAgent.name}"` : 'Enroll an agent'}
+      description={
+        rekeyAgent
+          ? 'Mint a single-use re-key token, then run the command on that agent\'s host. The agent keeps its identity and instance bindings. The token is shown only once.'
+          : 'Mint a single-use token, then run the install command on the host. The token is shown only once.'
+      }
       footer={
         result ? (
           <Button onClick={onClose}>Done</Button>
@@ -189,17 +211,33 @@ function MintTokenDialog({ onClose }: { onClose: () => void }) {
       {result ? (
         <div className="space-y-4">
           <div>
-            <div className="mb-1 text-sm font-medium text-ink-700 dark:text-ink-200">Install command</div>
+            <div className="mb-1 text-sm font-medium text-ink-700 dark:text-ink-200">
+              {rekeyAgent ? 'Run on the agent’s host' : 'Install command'}
+            </div>
             <CodeBlock content={installCommand} />
           </div>
-          <p className="text-xs text-ink-500">
+          <p className="text-xs text-ink-500 dark:text-ink-400">
             Expires {new Date(result.expiresAtUtc).toLocaleString()}. Copy it now — for security, the token cannot be shown again.
           </p>
         </div>
       ) : (
-        <p className="text-sm text-ink-500">
-          The agent makes an outbound-only mTLS connection to WireHQ and pulls signed deployment jobs — no inbound ports or stored credentials.
-        </p>
+        rekeyAgent ? (
+          <div className="space-y-2 text-sm text-ink-500 dark:text-ink-400">
+            <p>
+              Use this when the agent&apos;s certificate has expired, or to cut off a host you no longer trust: once the
+              token is redeemed, every certificate the agent held before stops working.
+            </p>
+            <p>
+              Run it on the agent&apos;s host <strong>without deleting its state directory</strong> — that is where the
+              agent keeps its WireGuard interface keys. For the gateway container, set{' '}
+              <code className="font-mono text-xs">WIREHQ_REKEY_TOKEN</code> and restart it.
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-ink-500 dark:text-ink-400">
+            The agent makes an outbound-only mTLS connection to WireHQ and pulls signed deployment jobs — no inbound ports or stored credentials.
+          </p>
+        )
       )}
     </Dialog>
   );
@@ -222,7 +260,7 @@ function connectivity(agent: Agent): { label: string; dotClass: string } {
 /**
  * Client-certificate health. The agent renews once two-thirds of its cert's lifetime has passed (~15 days before
  * expiry on the 45-day leaf), so a cert inside 10 days means it has missed renewals for days — usually an agent
- * binary too old to rotate, or a host that has been offline. An expired cert cannot renew: the agent must re-enrol.
+ * binary too old to rotate, or a host that has been offline. An expired cert cannot renew itself; Re-key restores it.
  */
 function certificateHealth(agent: Agent): { label: string; title: string; tone?: 'warning' | 'danger' } {
   if (agent.status === 'Revoked' || !agent.certificateNotAfterUtc) {
@@ -235,7 +273,7 @@ function certificateHealth(agent: Agent): { label: string; title: string; tone?:
     return {
       label: 'Expired',
       tone: 'danger',
-      title: `Expired ${when}. The agent can no longer connect — re-enroll it with a new token.`,
+      title: `Expired ${when}. The agent can no longer connect — use Re-key to restore it with its instances intact.`,
     };
   }
   if (days < 10) {

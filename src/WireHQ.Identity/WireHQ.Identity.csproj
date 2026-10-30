@@ -6,7 +6,7 @@
     security is a distinct, high-scrutiny surface that will grow (SSO/SCIM/passkeys).
   -->
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>WireHQ.Identity</RootNamespace>
   </PropertyGroup>
 

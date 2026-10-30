@@ -40,11 +40,11 @@ import {
 
 const DELIVERY_TONE: Record<NotificationDelivery['status'], string> = {
   Delivered: 'bg-success-500/15 text-success-700 dark:text-success-400',
-  Pending: 'bg-gold-500/15 text-gold-700 dark:text-gold-400',
+  Pending: 'bg-gold-500/15 text-gold-800 dark:text-gold-400',
   Failed: 'bg-danger-500/15 text-danger-600 dark:text-danger-400',
-  Cancelled: 'bg-ink-500/15 text-ink-400',
+  Cancelled: 'bg-ink-500/15 text-ink-600 dark:text-ink-400',
   // Amber, not red: nothing is known to have gone wrong. It may well have arrived.
-  Unresolved: 'bg-gold-500/15 text-gold-700 dark:text-gold-400',
+  Unresolved: 'bg-gold-500/15 text-gold-800 dark:text-gold-400',
 };
 
 /** What a status means in the operator's terms, where the word alone would mislead. */
@@ -79,8 +79,8 @@ export function NotificationsSettingsPage() {
         <PageHeader title="Notifications" subtitle="Get notified when things happen in your organization." />
         <Card className="max-w-2xl">
           <CardContent>
-            <p className="text-sm text-ink-400">
-              You need the <span className="font-medium text-ink-200">Manage notifications</span> permission to
+            <p className="text-sm text-ink-500 dark:text-ink-400">
+              You need the <span className="font-medium text-ink-800 dark:text-ink-200">Manage notifications</span> permission to
               configure notification rules. Ask an organization owner or admin.
             </p>
           </CardContent>
@@ -124,24 +124,24 @@ export function NotificationsSettingsPage() {
       {canAcknowledge && <ActiveAlertsCard />}
 
       {isLoading ? (
-        <p className="text-sm text-ink-400">Loading…</p>
+        <p className="text-sm text-ink-500 dark:text-ink-400">Loading…</p>
       ) : (
         <div className="max-w-3xl space-y-6">
           <Card>
             <CardContent>
               {rules && rules.length > 0 ? (
-                <div className="divide-y divide-ink-800">
+                <div className="divide-y divide-ink-200 dark:divide-ink-800">
                   {rules.map((rule) => (
                     <div key={rule.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="truncate text-sm font-medium text-ink-100">{rule.name}</p>
-                          {!rule.enabled && <span className="shrink-0 rounded-full bg-ink-500/15 px-2 py-0.5 text-xs font-medium text-ink-400">Disabled</span>}
+                          <p className="truncate text-sm font-medium text-ink-900 dark:text-ink-100">{rule.name}</p>
+                          {!rule.enabled && <span className="shrink-0 rounded-full bg-ink-500/15 px-2 py-0.5 text-xs font-medium text-ink-600 dark:text-ink-400">Disabled</span>}
                         </div>
-                        <p className="mt-0.5 text-xs text-ink-500">
+                        <p className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">
                           <span className="font-mono">{rule.eventPattern}</span>
                           {rule.additionalPatterns.length > 0 && (
-                            <span className="text-ink-400"> +{rule.additionalPatterns.length}</span>
+                            <span className="text-ink-500 dark:text-ink-400"> +{rule.additionalPatterns.length}</span>
                           )}{' '}
                           → {rule.channel} · {rule.audience === 'Role' ? 'role' : 'opted-in users'}
                         </p>
@@ -156,7 +156,7 @@ export function NotificationsSettingsPage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-ink-400">No notification rules yet. Create one to email your team on matching events.</p>
+                <p className="text-sm text-ink-500 dark:text-ink-400">No notification rules yet. Create one to email your team on matching events.</p>
               )}
             </CardContent>
           </Card>
@@ -181,14 +181,14 @@ function DeliveryHistory() {
   return (
     <Card>
       <CardContent>
-        <h2 className="mb-3 text-sm font-semibold text-ink-200">Recent deliveries</h2>
-        <div className="divide-y divide-ink-800">
+        <h2 className="mb-3 text-sm font-semibold text-ink-800 dark:text-ink-200">Recent deliveries</h2>
+        <div className="divide-y divide-ink-200 dark:divide-ink-800">
           {deliveries.map((d) => (
             <div key={d.id} className="flex items-center justify-between gap-4 py-2 first:pt-0 last:pb-0">
               <div className="min-w-0">
-                <p className="truncate text-sm text-ink-200">{d.subject}</p>
-                <p className="truncate text-xs text-ink-500">{d.recipient} · {formatDate(d.createdAtUtc)}</p>
-                {d.lastError && <p className="truncate text-xs text-danger-500">{d.lastError}</p>}
+                <p className="truncate text-sm text-ink-800 dark:text-ink-200">{d.subject}</p>
+                <p className="truncate text-xs text-ink-500 dark:text-ink-400">{d.recipient} · {formatDate(d.createdAtUtc)}</p>
+                {d.lastError && <p className="truncate text-xs text-danger-700 dark:text-danger-500">{d.lastError}</p>}
               </div>
               <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${DELIVERY_TONE[d.status]}`}>{DELIVERY_LABEL[d.status] ?? d.status}</span>
             </div>
@@ -222,8 +222,8 @@ function ChatDestinationCard() {
   return (
     <Card>
       <CardContent>
-        <h2 className="mb-1 text-sm font-semibold text-ink-200">Chat destination</h2>
-        <p className="mb-3 text-xs text-ink-500">
+        <h2 className="mb-1 text-sm font-semibold text-ink-800 dark:text-ink-200">Chat destination</h2>
+        <p className="mb-3 text-xs text-ink-500 dark:text-ink-400">
           {chat?.configured
             ? `Configured — ${chat.provider} (the webhook URL is hidden). Re-paste to change it.`
             : 'Paste a Microsoft Teams or Slack incoming-webhook URL to enable Chat rules.'}
@@ -281,10 +281,10 @@ function SmsProviderCard() {
     <Card>
       <CardContent>
         <div className="mb-1 flex items-center gap-2">
-          <h2 className="text-sm font-semibold text-ink-200">SMS provider</h2>
-          <span className="rounded-full bg-ink-500/15 px-2 py-0.5 text-xs font-medium text-ink-400">Coming soon</span>
+          <h2 className="text-sm font-semibold text-ink-800 dark:text-ink-200">SMS provider</h2>
+          <span className="rounded-full bg-ink-500/15 px-2 py-0.5 text-xs font-medium text-ink-600 dark:text-ink-400">Coming soon</span>
         </div>
-        <p className="mb-3 text-xs text-ink-500">
+        <p className="mb-3 text-xs text-ink-500 dark:text-ink-400">
           {config?.configured
             ? `Configured — ${config.provider}${config.fromMasked ? ` · from ${config.fromMasked}` : ''} (the credential is hidden). Re-enter to change it.`
             : 'Connect your own Twilio account to send critical alerts over SMS. Your credentials, your number, your carrier bill.'}
@@ -312,11 +312,11 @@ function SmsProviderCard() {
         </form>
 
         {config?.configured && (
-          <div className="mt-4 border-t border-ink-800 pt-4">
-            <h3 className="mb-1 text-xs font-semibold text-ink-300">A2P / 10DLC attestation</h3>
+          <div className="mt-4 border-t border-ink-200 dark:border-ink-800 pt-4">
+            <h3 className="mb-1 text-xs font-semibold text-ink-700 dark:text-ink-300">A2P / 10DLC attestation</h3>
             {config.a2pAttested ? (
               <div className="flex items-start justify-between gap-3">
-                <p className="text-xs text-ink-500">
+                <p className="text-xs text-ink-500 dark:text-ink-400">
                   Attested{config.a2pAttestedAtUtc ? ` ${formatDate(config.a2pAttestedAtUtc)}` : ''}
                   {config.a2pReference ? ` · ${config.a2pReference}` : ''}. SMS sending is unlocked once the module is live.
                 </p>
@@ -333,7 +333,7 @@ function SmsProviderCard() {
               </div>
             ) : (
               <div className="space-y-2">
-                <p className="text-xs text-ink-500">
+                <p className="text-xs text-ink-500 dark:text-ink-400">
                   Before WireHQ can send, confirm your 10DLC/A2P campaign is registered and approved with your provider,
                   and that WireHQ&rsquo;s critical-alert messages are covered by your registered sample templates. Alert
                   content is dynamic (event-driven).
@@ -420,9 +420,9 @@ function OptOutLedgerSection() {
   };
 
   return (
-    <div className="mt-6 border-t border-ink-800 pt-4">
-      <h3 className="mb-1 text-xs font-semibold text-ink-300">Opt-outs</h3>
-      <p className="mb-3 text-xs text-ink-400">
+    <div className="mt-6 border-t border-ink-200 dark:border-ink-800 pt-4">
+      <h3 className="mb-1 text-xs font-semibold text-ink-700 dark:text-ink-300">Opt-outs</h3>
+      <p className="mb-3 text-xs text-ink-500 dark:text-ink-400">
         Everyone who has asked not to receive SMS from you. WireHQ refuses to text these numbers, and the record is kept
         permanently as your proof — an opt-out is never deleted, only replaced if the person texts START themselves.
         Numbers are shown partly hidden; search for a full number to check a specific one.
@@ -448,37 +448,37 @@ function OptOutLedgerSection() {
         )}
       </form>
 
-      {error instanceof ApiError && <p className="mb-3 text-xs text-danger-400">{error.message}</p>}
+      {error instanceof ApiError && <p className="mb-3 text-xs text-danger-700 dark:text-danger-500">{error.message}</p>}
 
       {isLoading ? (
-        <p className="text-xs text-ink-500">Loading…</p>
+        <p className="text-xs text-ink-500 dark:text-ink-400">Loading…</p>
       ) : !optOuts?.length ? (
-        <p className="text-xs text-ink-500">
+        <p className="text-xs text-ink-500 dark:text-ink-400">
           {applied ? 'That number has never opted out.' : 'Nobody has opted out.'}
         </p>
       ) : (
         <ul className="mb-4 space-y-2">
           {optOuts.map((o) => (
-            <li key={o.id} className="rounded border border-ink-800 p-2 text-xs">
+            <li key={o.id} className="rounded border border-ink-200 dark:border-ink-800 p-2 text-xs">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium text-ink-100">{o.phoneMasked}</span>
+                <span className="font-medium text-ink-900 dark:text-ink-100">{o.phoneMasked}</span>
                 <span
                   className={
                     o.isActive
                       ? 'rounded-full bg-danger-500/15 px-2 py-0.5 text-danger-600 dark:text-danger-400'
-                      : 'rounded-full bg-ink-500/15 px-2 py-0.5 text-ink-400'
+                      : 'rounded-full bg-ink-500/15 px-2 py-0.5 text-ink-600 dark:text-ink-400'
                   }
                 >
                   {o.isActive ? 'Opted out' : 'Opted back in'}
                 </span>
-                <span className="text-ink-500">{OPT_OUT_SOURCE_LABEL[o.source]}</span>
+                <span className="text-ink-500 dark:text-ink-400">{OPT_OUT_SOURCE_LABEL[o.source]}</span>
               </div>
-              <p className="mt-1 text-ink-500">
+              <p className="mt-1 text-ink-500 dark:text-ink-400">
                 {formatDate(o.suppressedAtUtc)}
                 {o.clearedAtUtc ? ` · opted back in ${formatDate(o.clearedAtUtc)}` : ''}
                 {o.sender ? ` · sender ${o.sender}` : ''}
               </p>
-              {o.reason && <p className="mt-1 text-ink-400">{o.reason}</p>}
+              {o.reason && <p className="mt-1 text-ink-500 dark:text-ink-400">{o.reason}</p>}
             </li>
           ))}
         </ul>
@@ -486,16 +486,16 @@ function OptOutLedgerSection() {
 
       {/* Say when the list is capped rather than letting a truncated page read as "this is everyone". */}
       {!applied && optOuts && optOuts.length >= OPT_OUT_PAGE_SIZE && (
-        <p className="mb-4 text-xs text-ink-500">
+        <p className="mb-4 text-xs text-ink-500 dark:text-ink-400">
           Showing the {OPT_OUT_PAGE_SIZE} most recent. To check one particular number, search for it above.
         </p>
       )}
 
-      <div className="mt-4 border-t border-ink-800 pt-3">
-        <h4 className="mb-1 text-xs font-semibold text-ink-300">Record an opt-out</h4>
-        <p className="mb-2 text-xs text-ink-500">
+      <div className="mt-4 border-t border-ink-200 dark:border-ink-800 pt-3">
+        <h4 className="mb-1 text-xs font-semibold text-ink-700 dark:text-ink-300">Record an opt-out</h4>
+        <p className="mb-2 text-xs text-ink-500 dark:text-ink-400">
           If someone asked you to stop by phone, email or in person, record it here — a request to stop counts however it
-          reaches you. <strong className="text-ink-300">This cannot be undone from here:</strong> only the person
+          reaches you. <strong className="text-ink-700 dark:text-ink-300">This cannot be undone from here:</strong> only the person
           themselves can opt back in, by texting START to your number.
         </p>
         <form onSubmit={submitRecord} className="space-y-2">
@@ -543,18 +543,18 @@ function InboundWebhookSection({ config }: { config: SmsProviderConfig }) {
   const [minted, setMinted] = useState<SmsInboundWebhookToken | null>(null);
 
   return (
-    <div className="mt-6 border-t border-ink-800 pt-4">
-      <h3 className="mb-1 text-xs font-semibold text-ink-300">Inbound STOP/HELP webhook</h3>
+    <div className="mt-6 border-t border-ink-200 dark:border-ink-800 pt-4">
+      <h3 className="mb-1 text-xs font-semibold text-ink-700 dark:text-ink-300">Inbound STOP/HELP webhook</h3>
 
       {!config.inboundEndpointConfigured ? (
-        <p className="text-xs text-ink-400">
+        <p className="text-xs text-ink-500 dark:text-ink-400">
           This installation has no public inbound webhook URL configured, so a token cannot be issued yet. Ask your
-          administrator to set <code className="text-ink-300">Notifications:Sms:InboundWebhookBaseUrl</code> to the
+          administrator to set <code className="text-ink-700 dark:text-ink-300">Notifications:Sms:InboundWebhookBaseUrl</code> to the
           public https address of this install.
         </p>
       ) : (
         <>
-          <p className="mb-3 text-xs text-ink-400">
+          <p className="mb-3 text-xs text-ink-500 dark:text-ink-400">
             Your provider forwards incoming messages here so WireHQ can honour STOP. Until a real signed request
             arrives on this URL, SMS sending stays on hold — a webhook that has never been reached is indistinguishable
             from one that does not exist.
@@ -574,7 +574,7 @@ function InboundWebhookSection({ config }: { config: SmsProviderConfig }) {
 
           <dl className="mb-3 space-y-1 text-xs">
             <div className="flex gap-2">
-              <dt className="text-ink-400">Status</dt>
+              <dt className="text-ink-500 dark:text-ink-400">Status</dt>
               <dd className={config.inboundReady ? 'text-emerald-400' : 'text-amber-400'}>
                 {config.inboundReady
                   ? `Verified${config.inboundVerifiedAtUtc ? ` ${formatDate(config.inboundVerifiedAtUtc)}` : ''} — STOP messages are reaching WireHQ`
@@ -585,8 +585,8 @@ function InboundWebhookSection({ config }: { config: SmsProviderConfig }) {
             </div>
             {config.inboundTokenPresent && (
               <div className="flex gap-2">
-                <dt className="text-ink-400">Token</dt>
-                <dd className="text-ink-200">
+                <dt className="text-ink-500 dark:text-ink-400">Token</dt>
+                <dd className="text-ink-800 dark:text-ink-200">
                   {config.inboundUrlPrefix}
                   {config.inboundTokenPrefix}…
                   {config.inboundTokenMintedAtUtc ? ` · issued ${formatDate(config.inboundTokenMintedAtUtc)}` : ''}
@@ -595,8 +595,8 @@ function InboundWebhookSection({ config }: { config: SmsProviderConfig }) {
             )}
             {config.inboundRejectedCount > 0 && (
               <div className="flex gap-2">
-                <dt className="text-ink-400">Rejected</dt>
-                <dd className="text-ink-200">
+                <dt className="text-ink-500 dark:text-ink-400">Rejected</dt>
+                <dd className="text-ink-800 dark:text-ink-200">
                   {config.inboundRejectedCount} request{config.inboundRejectedCount === 1 ? '' : 's'} failed signature
                   checks{config.inboundLastRejectedAtUtc ? `, last ${formatDate(config.inboundLastRejectedAtUtc)}` : ''}
                 </dd>
@@ -606,7 +606,7 @@ function InboundWebhookSection({ config }: { config: SmsProviderConfig }) {
 
           {config.inboundRotating && (
             <div className="mb-3 rounded border border-ink-700 bg-ink-900/50 p-3 text-xs">
-              <p className="text-ink-300">
+              <p className="text-ink-700 dark:text-ink-300">
                 The previous URL still works until{' '}
                 {config.inboundPreviousExpiresAtUtc ? formatDate(config.inboundPreviousExpiresAtUtc) : 'it expires'}, so
                 nothing is lost while you update your provider.
@@ -651,7 +651,7 @@ function InboundWebhookSection({ config }: { config: SmsProviderConfig }) {
           </div>
 
           {config.inboundTokenPresent && (
-            <p className="mt-2 text-xs text-ink-500">
+            <p className="mt-2 text-xs text-ink-500 dark:text-ink-400">
               Revoking stops SMS sending until a new URL is issued and confirmed — no inbound webhook means no way to
               receive a STOP.
             </p>
@@ -680,14 +680,14 @@ function ActiveAlertsCard() {
   return (
     <Card className="mb-6 max-w-3xl border-gold-500/40">
       <CardContent>
-        <h2 className="mb-1 text-sm font-semibold text-ink-100">Active escalations</h2>
-        <p className="mb-3 text-xs text-ink-500">Acknowledge to stop an alert escalating to the next step.</p>
+        <h2 className="mb-1 text-sm font-semibold text-ink-900 dark:text-ink-100">Active escalations</h2>
+        <p className="mb-3 text-xs text-ink-500 dark:text-ink-400">Acknowledge to stop an alert escalating to the next step.</p>
         <ul className="space-y-2">
           {alerts.map((a) => (
-            <li key={a.jobId} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-ink-800 p-2">
+            <li key={a.jobId} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-ink-200 dark:border-ink-800 p-2">
               <div className="min-w-0">
-                <p className="truncate text-sm text-ink-200">{a.summary}</p>
-                <p className="text-xs text-ink-500">
+                <p className="truncate text-sm text-ink-800 dark:text-ink-200">{a.summary}</p>
+                <p className="text-xs text-ink-500 dark:text-ink-400">
                   {a.action} · step {a.escalationLevel} of {a.escalationStepCount} · started {formatDate(a.createdAtUtc)}
                 </p>
               </div>
@@ -819,7 +819,7 @@ function RuleEditorDialog({ rule, onClose }: { rule: NotificationRule | null; on
             ))}
           </Select>
           {isSms && (
-            <p className="mt-1 text-xs text-ink-500">SMS is limited to a single critical event.</p>
+            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">SMS is limited to a single critical event.</p>
           )}
         </Field>
 
@@ -833,7 +833,7 @@ function RuleEditorDialog({ rule, onClose }: { rule: NotificationRule | null; on
                     <button
                       type="button"
                       onClick={() => setAdditionalPatterns((xs) => xs.filter((x) => x !== p))}
-                      className="text-ink-500 hover:text-ink-200"
+                      className="text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-ink-200"
                       aria-label={`Remove ${p}`}
                     >
                       ×
@@ -859,7 +859,7 @@ function RuleEditorDialog({ rule, onClose }: { rule: NotificationRule | null; on
                   <option key={et.pattern} value={et.pattern}>{et.label} ({et.pattern})</option>
                 ))}
             </Select>
-            <p className="mt-1 text-xs text-ink-500">One rule can react to several events — an Advanced Notifications feature.</p>
+            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">One rule can react to several events — an Advanced Notifications feature.</p>
           </Field>
         )}
 
@@ -874,7 +874,7 @@ function RuleEditorDialog({ rule, onClose }: { rule: NotificationRule | null; on
               <option value="Daily">Daily digest</option>
               <option value="Weekly">Weekly digest</option>
             </Select>
-            <p className="mt-1 text-xs text-ink-500">Coalesce matching events into one periodic message — an Advanced Notifications feature.</p>
+            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">Coalesce matching events into one periodic message — an Advanced Notifications feature.</p>
           </Field>
         )}
 
@@ -882,13 +882,13 @@ function RuleEditorDialog({ rule, onClose }: { rule: NotificationRule | null; on
           <Field label="Quiet hours — advanced" htmlFor="rule-quiet-start">
             <div className="flex flex-wrap items-center gap-2">
               <Input id="rule-quiet-start" type="time" value={quietStart} onChange={(e) => setQuietStart(e.target.value)} aria-label="Quiet hours start" />
-              <span className="text-xs text-ink-500">to</span>
+              <span className="text-xs text-ink-500 dark:text-ink-400">to</span>
               <Input id="rule-quiet-end" type="time" value={quietEnd} onChange={(e) => setQuietEnd(e.target.value)} aria-label="Quiet hours end" />
               {quietOn && (
                 <button
                   type="button"
                   onClick={() => { setQuietStart(''); setQuietEnd(''); }}
-                  className="text-xs text-ink-500 hover:text-ink-200"
+                  className="text-xs text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-ink-200"
                 >
                   Clear
                 </button>
@@ -903,7 +903,7 @@ function RuleEditorDialog({ rule, onClose }: { rule: NotificationRule | null; on
                 </Select>
               </div>
             )}
-            <p className="mt-1 text-xs text-ink-500">
+            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
               {quietSameTime
                 ? 'Choose a different end time.'
                 : 'Hold deliveries during this window and release them when it ends. Leave both empty for none — an Advanced Notifications feature.'}
@@ -916,8 +916,8 @@ function RuleEditorDialog({ rule, onClose }: { rule: NotificationRule | null; on
             {escalationSteps.length > 0 && (
               <div className="mb-2 space-y-2">
                 {escalationSteps.map((step, i) => (
-                  <div key={i} className="flex flex-wrap items-center gap-2 rounded-md border border-ink-800 p-2">
-                    <span className="text-xs text-ink-500">After</span>
+                  <div key={i} className="flex flex-wrap items-center gap-2 rounded-md border border-ink-200 dark:border-ink-800 p-2">
+                    <span className="text-xs text-ink-500 dark:text-ink-400">After</span>
                     <Input
                       id={i === 0 ? 'rule-escalation' : undefined}
                       type="number"
@@ -926,7 +926,7 @@ function RuleEditorDialog({ rule, onClose }: { rule: NotificationRule | null; on
                       onChange={(e) => updateStep(i, { delayMinutes: Number(e.target.value) })}
                       aria-label={`Step ${i + 1} delay in minutes`}
                     />
-                    <span className="text-xs text-ink-500">min, notify</span>
+                    <span className="text-xs text-ink-500 dark:text-ink-400">min, notify</span>
                     <Select
                       value={step.audience}
                       onChange={(e) => updateStep(i, { audience: e.target.value as 'OptedInUsers' | 'Role', audienceRef: null })}
@@ -957,7 +957,7 @@ function RuleEditorDialog({ rule, onClose }: { rule: NotificationRule | null; on
                     <button
                       type="button"
                       onClick={() => setEscalationSteps((xs) => xs.filter((_, j) => j !== i))}
-                      className="text-ink-500 hover:text-ink-200"
+                      className="text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-ink-200"
                       aria-label={`Remove step ${i + 1}`}
                     >
                       ×
@@ -975,7 +975,7 @@ function RuleEditorDialog({ rule, onClose }: { rule: NotificationRule | null; on
                 Add escalation step
               </Button>
             )}
-            <p className="mt-1 text-xs text-ink-500">
+            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
               If no one acknowledges the alert in WireHQ, notify the next step after its delay — an Advanced Notifications feature.
             </p>
           </Field>
@@ -1001,10 +1001,10 @@ function RuleEditorDialog({ rule, onClose }: { rule: NotificationRule | null; on
             {canSms && <option value="Sms">SMS (critical alerts)</option>}
           </Select>
           {channelKind === 'Chat' && (
-            <p className="mt-1 text-xs text-ink-500">Set your Teams/Slack destination below before Chat rules can deliver.</p>
+            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">Set your Teams/Slack destination below before Chat rules can deliver.</p>
           )}
           {isSms && (
-            <p className="mt-1 text-xs text-ink-500">
+            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
               SMS is for a single critical event, sent immediately — no digests, quiet hours, or wildcards. Configure your provider below.
             </p>
           )}

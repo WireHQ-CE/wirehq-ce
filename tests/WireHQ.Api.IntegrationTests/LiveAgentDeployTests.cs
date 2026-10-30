@@ -43,9 +43,8 @@ public sealed class LiveAgentDeployTests(AgentGatewayFixture fixture) : IClassFi
         // The agent connects OUTBOUND to the gateway, which the test process hosts on the machine's loopback.
         // Host network mode lets the container reach it at localhost in every environment — the CI runner
         // (dotnet on the host) and a host-networked test container alike — without brittle host-gateway routing.
-        _agent = new ContainerBuilder()
-            .WithImage(_image)
-            .WithCreateParameterModifier(parameters => parameters.HostConfig.NetworkMode = "host")
+        _agent = new ContainerBuilder(_image)
+            .WithCreateParameterModifier(parameters => parameters.HostConfig!.NetworkMode = "host")
             .Build();
         await _agent.StartAsync();
     }

@@ -126,6 +126,7 @@ public sealed class ClientAddressTests
     [InlineData(ClientAddress.KnownNetworksKey, "10.0.0.0")]
     [InlineData(ClientAddress.KnownNetworksKey, "10.0.0.0/33")]
     [InlineData(ClientAddress.KnownNetworksKey, "not-a-network/8")]
+    [InlineData(ClientAddress.KnownNetworksKey, "10.0.0.5/8")] // host bits set — ambiguous intent
     [InlineData(ClientAddress.KnownProxiesKey, "haproxy.internal")]
     public void A_malformed_trust_setting_fails_at_boot_rather_than_guessing(string key, string value)
     {

@@ -10,7 +10,7 @@ export function PasswordStrength({ password }: { password: string }) {
 
   const { score, label } = estimateStrength(password);
   const tones = ['bg-danger-500', 'bg-danger-500', 'bg-warning-500', 'bg-gold-500', 'bg-success-500'];
-  const textTones = ['text-danger-500', 'text-danger-500', 'text-warning-500', 'text-gold-500', 'text-success-600 dark:text-success-500'];
+  const textTones = ['text-danger-700 dark:text-danger-500', 'text-danger-700 dark:text-danger-500', 'text-warning-700 dark:text-warning-500', 'text-gold-500', 'text-success-600 dark:text-success-500'];
 
   return (
     <div className="mt-2">

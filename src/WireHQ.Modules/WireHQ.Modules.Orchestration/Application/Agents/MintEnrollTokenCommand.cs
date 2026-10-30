@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using WireHQ.Application.Abstractions;
 using WireHQ.Application.Abstractions.Persistence;
 using WireHQ.Application.Common.Messaging;
@@ -64,4 +65,67 @@ public sealed class MintEnrollTokenCommandHandler(
 
     private static Task<Result<MintEnrollTokenResponse>> FromError(Error error) =>
         Task.FromResult<Result<MintEnrollTokenResponse>>(error);
+}
+
+/// <summary>
+/// Mints a single-use <b>re-key</b> token for an existing agent: the host redeems it with the ordinary
+/// <c>wirehq-agent enroll --token …</c>, and the gateway re-issues THIS agent's certificate instead of creating a new
+/// agent — so its id, name and every instance binding survive. The recovery path for an agent whose certificate
+/// expired, and the cut-off for a host that may be compromised (the old certificate stops working on redemption).
+/// Same permission as enrolling or binding an agent, because a re-key token carries the same power: whoever redeems
+/// it receives that agent's jobs. A revoked agent cannot be re-keyed. (docs/13 §6.2)
+/// </summary>
+public sealed record MintRekeyTokenCommand(Guid AgentId, int? TtlHours) : ICommand<MintEnrollTokenResponse>, IAuthorizedRequest
+{
+    public IReadOnlyCollection<string> RequiredPermissions => [OrchestrationPermissions.Agents.Manage];
+}
+
+public sealed class MintRekeyTokenCommandValidator : AbstractValidator<MintRekeyTokenCommand>
+{
+    public MintRekeyTokenCommandValidator() =>
+        RuleFor(x => x.TtlHours).InclusiveBetween(1, 168).When(x => x.TtlHours is not null);
+}
+
+public sealed class MintRekeyTokenCommandHandler(
+    IApplicationDbContext dbContext,
+    ITenantContext tenant,
+    IDateTimeProvider clock,
+    IAuditWriter audit)
+    : ICommandHandler<MintRekeyTokenCommand, MintEnrollTokenResponse>
+{
+    public async Task<Result<MintEnrollTokenResponse>> Handle(MintRekeyTokenCommand command, CancellationToken cancellationToken)
+    {
+        if (tenant.OrganizationId is not { } organizationId)
+        {
+            return Error.Forbidden("auth.tenant_required", "No active organization.");
+        }
+
+        // Tenant-scoped: another org's agent id is simply not found.
+        var agent = await dbContext.Set<Agent>().FirstOrDefaultAsync(a => a.Id == command.AgentId, cancellationToken);
+        if (agent is null)
+        {
+            return OrchestrationErrors.Agent.NotFound;
+        }
+
+        if (agent.Status == AgentStatus.Revoked)
+        {
+            return OrchestrationErrors.Agent.RekeyNotAllowed;
+        }
+
+        var clearToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+        var expiresAtUtc = clock.UtcNow.AddHours(command.TtlHours ?? AgentEnrollmentToken.DefaultTtlHours);
+
+        var result = AgentEnrollmentToken.IssueForRekey(
+            Guid.CreateVersion7(), organizationId, AgentEnrollmentToken.HashToken(clearToken), expiresAtUtc, agent.Id);
+        if (result.IsFailure)
+        {
+            return result.Error;
+        }
+
+        dbContext.Set<AgentEnrollmentToken>().Add(result.Value);
+        audit.Record("orch.agent_rekey_token.minted", AuditOutcome.Success,
+            nameof(Agent), agent.Id.ToString(), new { tokenId = result.Value.Id, expiresAtUtc });
+
+        return new MintEnrollTokenResponse(result.Value.Id, clearToken, expiresAtUtc);
+    }
 }

@@ -54,13 +54,13 @@ export function Dialog({
         <div className="flex items-start justify-between gap-4 px-5 pt-5">
           <div>
             <h2 className="text-h3 text-ink-900 dark:text-ink-50">{title}</h2>
-            {description && <p className="mt-1 text-sm text-ink-500">{description}</p>}
+            {description && <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">{description}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded-md p-1 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-800"
+            className="rounded-md p-1 text-ink-500 dark:text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-800"
           >
             <X className="size-4" />
           </button>

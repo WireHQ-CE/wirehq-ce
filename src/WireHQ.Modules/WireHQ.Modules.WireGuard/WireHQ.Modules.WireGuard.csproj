@@ -6,7 +6,7 @@
     ("wg") and minimal-API endpoints; the Api host discovers it via IModule. (docs/11-wireguard-module.md)
   -->
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>WireHQ.Modules.WireGuard</RootNamespace>
   </PropertyGroup>
 

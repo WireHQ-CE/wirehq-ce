@@ -35,7 +35,7 @@ export function AuditFilters({
       className="mb-4 space-y-3 rounded-lg border bg-ink-0 p-4 dark:border-ink-800 dark:bg-ink-900"
     >
       <div className="flex items-center gap-2">
-        <Search className="size-4 shrink-0 text-ink-400" />
+        <Search className="size-4 shrink-0 text-ink-500 dark:text-ink-400" />
         <Input
           placeholder="Search action, actor, target…"
           value={draft.q ?? ''}
@@ -52,11 +52,11 @@ export function AuditFilters({
           <option value="Success">Success</option>
           <option value="Failure">Failure</option>
         </Select>
-        <label className="flex flex-col text-xs text-ink-500">
+        <label className="flex flex-col text-xs text-ink-500 dark:text-ink-400">
           <span className="mb-0.5">From</span>
           <Input type="date" value={draft.from ?? ''} onChange={(e) => set('from', e.target.value)} />
         </label>
-        <label className="flex flex-col text-xs text-ink-500">
+        <label className="flex flex-col text-xs text-ink-500 dark:text-ink-400">
           <span className="mb-0.5">To</span>
           <Input type="date" value={draft.to ?? ''} onChange={(e) => set('to', e.target.value)} />
         </label>

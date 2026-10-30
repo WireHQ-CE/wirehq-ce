@@ -38,8 +38,9 @@ The agent's identity (client key + cert, the org CA cert, the agent id) is store
 
 The client certificate lasts 45 days and the agent **renews it automatically** (with a fresh key) once
 two-thirds of that has passed — no restart, no operator action. An interrupted renewal is completed or discarded
-on the next start. If the certificate has already **expired** the gateway refuses it, and the agent logs how to
-re-enrol. Details: [`docs/13-agent.md`](../docs/13-agent.md) §6.1.
+on the next start. If the certificate has already **expired** the gateway refuses it. Restore it with a **re-key**
+(Agents tab → Re-key, then the same `enroll` command with that token), which keeps the agent's instances. **Don't**
+delete the state directory first. Details: [`docs/13-agent.md`](../docs/13-agent.md) §6.1–§6.2.
 
 Each poll the agent also reports its **observed status** (and, for `AgentManaged` interfaces, the
 locally-held interface public key). It records the hash of the config it applied per interface, and if the

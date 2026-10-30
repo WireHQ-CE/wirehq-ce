@@ -49,14 +49,14 @@ export function ResetPasswordPage() {
       }
     >
       {!token ? (
-        <p className="text-sm text-danger-500">This reset link is missing its token. Request a new one.</p>
+        <p className="text-sm text-danger-700 dark:text-danger-500">This reset link is missing its token. Request a new one.</p>
       ) : (
         <form onSubmit={onSubmit} className="space-y-4">
           <Field label="New password" htmlFor="password" error={errors.newPassword?.[0]}>
             <Input id="password" type="password" autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </Field>
           {captcha.widget}
-          {error && <p className="text-sm text-danger-500">{error}</p>}
+          {error && <p className="text-sm text-danger-700 dark:text-danger-500">{error}</p>}
           <Button type="submit" className="w-full" disabled={submitting || (captcha.required && !captcha.token)}>
             {submitting ? 'Updating…' : 'Update password'}
           </Button>

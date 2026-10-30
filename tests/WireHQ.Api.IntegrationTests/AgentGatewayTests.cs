@@ -492,6 +492,89 @@ public sealed class AgentGatewayTests(AgentGatewayFixture fixture) : IClassFixtu
         (await newClient.PostAsJsonAsync("/agent/v1/heartbeat", new { })).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    [Fact]
+    public async Task A_rekey_token_reissues_the_same_agent_so_its_instance_bindings_survive()
+    {
+        var api = _fixture.CreateApiClient();
+        var email = await RegisterOwnerAsync(api);
+        await _fixture.VerifyEmailAsync(email);
+        var (agentId, oldCert) = await EnrollAsync(api);
+
+        // Bind an instance to the agent — the binding is what an expired agent would lose by re-enrolling as new.
+        var networkId = await CreatedId(api.PostAsJsonAsync("/api/v1/wireguard/networks",
+            new { name = "RekeyNet", cidr = "10.92.0.0/24" }));
+        var instanceId = await CreatedId(api.PostAsJsonAsync("/api/v1/wireguard/instances",
+            new { networkId, name = "RekeyGW", listenPort = 51902, interfaceAddress = "10.92.0.1/24" }));
+        (await api.PutAsJsonAsync($"/api/v1/wireguard/instances/{instanceId}/target",
+            new { kind = "Agent", agentId })).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var rekeyToken = await MintRekeyTokenAsync(api, agentId);
+        var (csrPem, key) = BuildCsr();
+        using var noCertClient = _fixture.CreateAgentClient(null);
+        var enroll = await noCertClient.PostAsJsonAsync("/agent/v1/enroll", new { token = rekeyToken, csr = csrPem });
+        enroll.StatusCode.Should().Be(HttpStatusCode.OK);
+        var rekeyed = (await enroll.Content.ReadFromJsonAsync<EnrollResponse>())!;
+
+        // Same agent, not a new one — and it still manages the instance.
+        rekeyed.AgentId.Should().Be(agentId);
+        var agents = (await api.GetFromJsonAsync<List<AgentDto>>("/api/v1/agents"))!;
+        agents.Should().ContainSingle();
+        agents.Single().ManagedInstances.Should().Be(1);
+
+        // The new certificate works; the old one stopped working the moment the new one was issued.
+        using var newCert = BuildClientCertificate(rekeyed.CertificatePem, key);
+        using var newClient = _fixture.CreateAgentClient(newCert);
+        (await newClient.PostAsJsonAsync("/agent/v1/heartbeat", new { })).StatusCode.Should().Be(HttpStatusCode.OK);
+        using var oldClient = _fixture.CreateAgentClient(oldCert);
+        (await oldClient.PostAsJsonAsync("/agent/v1/heartbeat", new { })).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        // Single-use, like any enrolment token.
+        var (againCsr, _) = BuildCsr();
+        (await noCertClient.PostAsJsonAsync("/agent/v1/enroll", new { token = rekeyToken, csr = againCsr })).StatusCode
+            .Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task A_revoked_agent_cannot_be_rekeyed_even_with_a_token_minted_before_the_revocation()
+    {
+        var api = _fixture.CreateApiClient();
+        await RegisterOwnerAsync(api);
+        var (agentId, _) = await EnrollAsync(api);
+        var tokenMintedEarlier = await MintRekeyTokenAsync(api, agentId);
+
+        (await api.PostAsync($"/api/v1/agents/{agentId}/revoke", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // Minting is refused outright…
+        (await api.PostAsJsonAsync($"/api/v1/agents/{agentId}/rekey-tokens", new { })).StatusCode
+            .Should().Be(HttpStatusCode.Conflict);
+
+        // …and a token minted before the revocation cannot resurrect the agent.
+        var (csrPem, _) = BuildCsr();
+        using var noCertClient = _fixture.CreateAgentClient(null);
+        (await noCertClient.PostAsJsonAsync("/agent/v1/enroll", new { token = tokenMintedEarlier, csr = csrPem })).StatusCode
+            .Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task An_org_cannot_mint_a_rekey_token_for_another_orgs_agent()
+    {
+        var owner = _fixture.CreateApiClient();
+        await RegisterOwnerAsync(owner);
+        var (agentId, _) = await EnrollAsync(owner);
+
+        var other = _fixture.CreateApiClient();
+        await RegisterOwnerAsync(other);
+        (await other.PostAsJsonAsync($"/api/v1/agents/{agentId}/rekey-tokens", new { })).StatusCode
+            .Should().Be(HttpStatusCode.NotFound);
+    }
+
+    private static async Task<string> MintRekeyTokenAsync(HttpClient api, Guid agentId)
+    {
+        var response = await api.PostAsJsonAsync($"/api/v1/agents/{agentId}/rekey-tokens", new { });
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        return (await response.Content.ReadFromJsonAsync<MintResponse>())!.Token;
+    }
+
     /// <summary>Enrols a fresh agent and returns its id + a client cert ready to present over mTLS.</summary>
     private async Task<(Guid AgentId, X509Certificate2 Certificate)> EnrollAsync(HttpClient api)
     {

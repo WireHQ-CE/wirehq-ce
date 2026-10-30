@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text;
 using Asp.Versioning.ApiExplorer;
-using Microsoft.OpenApi.Writers;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.Swagger;
 
 namespace WireHQ.Api.Extensions;

@@ -35,8 +35,8 @@ export function RolesSettingsPage() {
         <PageHeader title="Roles" subtitle="Define custom roles for your organization." />
         <Card className="max-w-2xl">
           <CardContent>
-            <p className="text-sm text-ink-400">
-              Custom roles are an <span className="font-medium text-ink-200">Enterprise</span> feature. Contact
+            <p className="text-sm text-ink-500 dark:text-ink-400">
+              Custom roles are an <span className="font-medium text-ink-800 dark:text-ink-200">Enterprise</span> feature. Contact
               sales to enable them for your organization.
             </p>
           </CardContent>
@@ -65,7 +65,7 @@ export function RolesSettingsPage() {
       />
 
       {isLoading ? (
-        <p className="text-sm text-ink-400">Loading…</p>
+        <p className="text-sm text-ink-500 dark:text-ink-400">Loading…</p>
       ) : (
         <div className="max-w-3xl space-y-6">
           <RoleGroup title="Custom roles" empty="No custom roles yet.">
@@ -84,7 +84,7 @@ export function RolesSettingsPage() {
           <RoleGroup title="System roles" empty="">
             {systemRoles.map((role) => (
               <RoleRow key={role.id} role={role}>
-                <span className="rounded-full bg-ink-500/15 px-2 py-0.5 text-xs font-medium text-ink-400">Built-in</span>
+                <span className="rounded-full bg-ink-500/15 px-2 py-0.5 text-xs font-medium text-ink-600 dark:text-ink-400">Built-in</span>
               </RoleRow>
             ))}
           </RoleGroup>
@@ -104,8 +104,8 @@ function RoleGroup({ title, empty, children }: { title: string; empty: string; c
   return (
     <Card>
       <CardContent>
-        <h3 className="mb-3 text-sm font-semibold text-ink-100">{title}</h3>
-        {hasItems ? <div className="divide-y divide-ink-800">{children}</div> : <p className="text-sm text-ink-400">{empty}</p>}
+        <h3 className="mb-3 text-sm font-semibold text-ink-900 dark:text-ink-100">{title}</h3>
+        {hasItems ? <div className="divide-y divide-ink-200 dark:divide-ink-800">{children}</div> : <p className="text-sm text-ink-500 dark:text-ink-400">{empty}</p>}
       </CardContent>
     </Card>
   );
@@ -115,8 +115,8 @@ function RoleRow({ role, children }: { role: OrgRole; children: React.ReactNode 
   return (
     <div className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
       <div>
-        <p className="text-sm font-medium text-ink-100">{role.name}</p>
-        {role.description && <p className="mt-0.5 text-xs text-ink-400">{role.description}</p>}
+        <p className="text-sm font-medium text-ink-900 dark:text-ink-100">{role.name}</p>
+        {role.description && <p className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">{role.description}</p>}
       </div>
       {children}
     </div>
@@ -204,10 +204,10 @@ function RoleEditorDialog({ roleId, onClose }: { roleId: string | null; onClose:
         </Field>
 
         <div className="space-y-4">
-          <p className="text-sm font-medium text-ink-200">Permissions</p>
+          <p className="text-sm font-medium text-ink-800 dark:text-ink-200">Permissions</p>
           {grouped.map(([group, perms]) => (
             <div key={group} className="space-y-1.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">{group}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-500 dark:text-ink-400">{group}</p>
               {perms.map((p) => {
                 // Mirror the server's escalation guard: you can add only permissions you hold, but may remove an
                 // existing grant you lack.
@@ -222,8 +222,8 @@ function RoleEditorDialog({ roleId, onClose }: { roleId: string | null; onClose:
                       onChange={() => toggle(p.id)}
                     />
                     <span>
-                      <span className="text-ink-200">{p.description}</span>
-                      <span className="ml-1 text-xs text-ink-500">({p.key})</span>
+                      <span className="text-ink-800 dark:text-ink-200">{p.description}</span>
+                      <span className="ml-1 text-xs text-ink-500 dark:text-ink-400">({p.key})</span>
                     </span>
                   </label>
                 );

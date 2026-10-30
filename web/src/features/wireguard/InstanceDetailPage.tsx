@@ -79,7 +79,7 @@ export function InstanceDetailPage() {
     return (
       <div className="space-y-3">
         <BackLink />
-        <p className="text-sm text-ink-500">This instance could not be found.</p>
+        <p className="text-sm text-ink-500 dark:text-ink-400">This instance could not be found.</p>
       </div>
     );
   }
@@ -93,7 +93,7 @@ export function InstanceDetailPage() {
             <h1 className="text-h1 text-ink-900 dark:text-ink-50">{instance.name}</h1>
             <Badge tone={statusTone[instance.status] ?? 'neutral'} dot>{instance.status}</Badge>
           </div>
-          <p className="mt-1 font-mono text-sm text-ink-400">{instance.slug} · {instance.providerType}</p>
+          <p className="mt-1 font-mono text-sm text-ink-500 dark:text-ink-400">{instance.slug} · {instance.providerType}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {canExport && <ServerConfigButton instance={instance} />}
@@ -123,7 +123,7 @@ export function InstanceDetailPage() {
 
 function BackLink() {
   return (
-    <Link to="/app/wireguard" className="inline-flex items-center gap-1.5 text-sm text-ink-500 transition-colors hover:text-ink-800 dark:hover:text-ink-200">
+    <Link to="/app/wireguard" className="inline-flex items-center gap-1.5 text-sm text-ink-500 dark:text-ink-400 transition-colors hover:text-ink-800 dark:hover:text-ink-200">
       <ArrowLeft className="size-4" /> WireGuard
     </Link>
   );
@@ -187,7 +187,7 @@ function PeersSection({ instanceId, canManage, canEnroll }: { instanceId: string
       ) : (
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:border-ink-800">
+            <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:text-ink-400 dark:border-ink-800">
               <th className="px-5 py-3 font-medium">Name</th>
               <th className="px-5 py-3 font-medium">Address</th>
               <th className="px-5 py-3 font-medium">Status</th>
@@ -201,17 +201,17 @@ function PeersSection({ instanceId, canManage, canEnroll }: { instanceId: string
               <tr key={p.id} className="border-b last:border-0 hover:bg-ink-50 dark:border-ink-800 dark:hover:bg-ink-850">
                 <td className="px-5 py-3">
                   <div className="font-medium text-ink-800 dark:text-ink-100">{p.name}</div>
-                  {p.deviceType && <div className="text-xs text-ink-400">{p.deviceType}</div>}
+                  {p.deviceType && <div className="text-xs text-ink-500 dark:text-ink-400">{p.deviceType}</div>}
                 </td>
-                <td className="px-5 py-3 font-mono text-ink-500">{p.assignedAddress}</td>
+                <td className="px-5 py-3 font-mono text-ink-500 dark:text-ink-400">{p.assignedAddress}</td>
                 <td className="px-5 py-3"><Badge tone={peerTone[p.status] ?? 'neutral'} dot>{p.status}</Badge></td>
                 <td
-                  className="px-5 py-3 text-ink-400"
+                  className="px-5 py-3 text-ink-500 dark:text-ink-400"
                   title={p.lastHandshakeAtUtc ? new Date(p.lastHandshakeAtUtc).toLocaleString() : ''}
                 >
                   {p.lastHandshakeAtUtc ? formatRelative(p.lastHandshakeAtUtc) : '—'}
                 </td>
-                <td className="px-5 py-3 whitespace-nowrap text-ink-400">
+                <td className="px-5 py-3 whitespace-nowrap text-ink-500 dark:text-ink-400">
                   {p.rxBytes > 0 || p.txBytes > 0 ? (
                     <span className="font-mono text-xs">↓{formatBytes(p.rxBytes)} ↑{formatBytes(p.txBytes)}</span>
                   ) : (
@@ -247,7 +247,7 @@ function PeersSection({ instanceId, canManage, canEnroll }: { instanceId: string
 
 function IconAction({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
   return (
-    <Button variant="ghost" size="icon" onClick={onClick} aria-label={label} title={label} className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-100">
+    <Button variant="ghost" size="icon" onClick={onClick} aria-label={label} title={label} className="text-ink-500 dark:text-ink-400 hover:text-ink-700 dark:hover:text-ink-100">
       {children}
     </Button>
   );
@@ -381,7 +381,7 @@ function EditInstanceDialog({ instance, onClose }: { instance: InstanceDetail; o
 function Detail({ label, value, mono }: { label: string; value: ReactNode; mono?: boolean }) {
   return (
     <div className="min-w-0">
-      <div className="text-xs font-medium uppercase tracking-wide text-ink-500">{label}</div>
+      <div className="text-xs font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">{label}</div>
       <div className={`mt-0.5 truncate text-sm text-ink-800 dark:text-ink-100 ${mono ? 'font-mono' : ''}`} title={typeof value === 'string' ? value : undefined}>
         {value}
       </div>

@@ -25,12 +25,12 @@ import {
 
 const STATUS_TONE: Record<Webhook['status'], string> = {
   Active: 'bg-success-500/15 text-success-700 dark:text-success-400',
-  Disabled: 'bg-ink-500/15 text-ink-400',
+  Disabled: 'bg-ink-500/15 text-ink-600 dark:text-ink-400',
 };
 
 const DELIVERY_TONE: Record<WebhookDelivery['status'], string> = {
   Delivered: 'bg-success-500/15 text-success-700 dark:text-success-400',
-  Pending: 'bg-gold-500/15 text-gold-700 dark:text-gold-400',
+  Pending: 'bg-gold-500/15 text-gold-800 dark:text-gold-400',
   Failed: 'bg-danger-500/15 text-danger-600 dark:text-danger-400',
 };
 
@@ -61,8 +61,8 @@ export function WebhooksSettingsPage() {
         <PageHeader title="Webhooks" subtitle="Get notified when things happen in your organization." />
         <Card className="max-w-2xl">
           <CardContent>
-            <p className="text-sm text-ink-400">
-              Webhooks are an <span className="font-medium text-ink-200">Enterprise</span> feature. Contact sales to
+            <p className="text-sm text-ink-500 dark:text-ink-400">
+              Webhooks are an <span className="font-medium text-ink-800 dark:text-ink-200">Enterprise</span> feature. Contact sales to
               enable outbound event notifications for your organization.
             </p>
           </CardContent>
@@ -104,13 +104,13 @@ export function WebhooksSettingsPage() {
       />
 
       {isLoading ? (
-        <p className="text-sm text-ink-400">Loading…</p>
+        <p className="text-sm text-ink-500 dark:text-ink-400">Loading…</p>
       ) : (
         <div className="max-w-3xl">
           <Card>
             <CardContent>
               {webhooks && webhooks.length > 0 ? (
-                <div className="divide-y divide-ink-800">
+                <div className="divide-y divide-ink-200 dark:divide-ink-800">
                   {webhooks.map((webhook) => (
                     <WebhookRow key={webhook.id} webhook={webhook}>
                       <div className="flex flex-wrap justify-end gap-2">
@@ -131,7 +131,7 @@ export function WebhooksSettingsPage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-ink-400">
+                <p className="text-sm text-ink-500 dark:text-ink-400">
                   No webhook endpoints yet.{canManage ? ' Create one to receive event notifications.' : ''}
                 </p>
               )}
@@ -163,13 +163,13 @@ function WebhookRow({ webhook, children }: { webhook: Webhook; children: ReactNo
     <div className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <p className="truncate font-mono text-sm text-ink-100">{webhook.url}</p>
+          <p className="truncate font-mono text-sm text-ink-900 dark:text-ink-100">{webhook.url}</p>
           <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_TONE[webhook.status]}`}>
             {webhook.status}
           </span>
         </div>
-        {webhook.description && <p className="mt-0.5 text-xs text-ink-400">{webhook.description}</p>}
-        <p className="mt-0.5 text-xs text-ink-500">{webhook.eventTypes.join(', ')}</p>
+        {webhook.description && <p className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">{webhook.description}</p>}
+        <p className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">{webhook.eventTypes.join(', ')}</p>
       </div>
       {children}
     </div>
@@ -264,16 +264,16 @@ function WebhookEditorDialog({
         </Field>
 
         <div className="space-y-4">
-          <p className="text-sm font-medium text-ink-200">Events</p>
+          <p className="text-sm font-medium text-ink-800 dark:text-ink-200">Events</p>
           {grouped.map(([group, options]) => (
             <div key={group} className="space-y-1.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">{group}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-500 dark:text-ink-400">{group}</p>
               {options.map((option) => (
                 <label key={option.pattern} className="flex items-start gap-2 text-sm">
                   <input type="checkbox" className="mt-0.5" checked={selected.has(option.pattern)} onChange={() => toggle(option.pattern)} />
                   <span>
-                    <span className="text-ink-200">{option.description}</span>
-                    <span className="ml-1 text-xs text-ink-500">({option.pattern})</span>
+                    <span className="text-ink-800 dark:text-ink-200">{option.description}</span>
+                    <span className="ml-1 text-xs text-ink-500 dark:text-ink-400">({option.pattern})</span>
                   </span>
                 </label>
               ))}
@@ -281,11 +281,11 @@ function WebhookEditorDialog({
           ))}
           {custom.length > 0 && (
             <div className="space-y-1.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Custom</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-500 dark:text-ink-400">Custom</p>
               {custom.map((pattern) => (
                 <label key={pattern} className="flex items-start gap-2 text-sm">
                   <input type="checkbox" className="mt-0.5" checked onChange={() => toggle(pattern)} />
-                  <span className="font-mono text-xs text-ink-300">{pattern}</span>
+                  <span className="font-mono text-xs text-ink-700 dark:text-ink-300">{pattern}</span>
                 </label>
               ))}
             </div>
@@ -307,7 +307,7 @@ function SecretRevealDialog({ secret, onClose }: { secret: string; onClose: () =
       footer={<Button onClick={onClose}>Done</Button>}
     >
       <div className="space-y-3">
-        <div className="rounded-md border border-gold-500/40 bg-gold-500/5 p-3 text-sm text-ink-300">
+        <div className="rounded-md border border-gold-500/40 bg-gold-500/5 p-3 text-sm text-ink-700 dark:text-ink-300">
           Use this to verify each delivery's <code className="font-mono text-xs">X-WireHQ-Signature</code> header
           (HMAC-SHA256 of the raw body). It's the only time the secret is displayed — store it somewhere safe.
         </div>
@@ -323,9 +323,9 @@ function DeliveriesDialog({ webhook, onClose }: { webhook: Webhook; onClose: () 
   return (
     <Dialog open onClose={onClose} title="Recent deliveries" description={webhook.url} className="max-w-2xl" footer={<Button onClick={onClose}>Close</Button>}>
       {isLoading ? (
-        <p className="text-sm text-ink-400">Loading…</p>
+        <p className="text-sm text-ink-500 dark:text-ink-400">Loading…</p>
       ) : deliveries && deliveries.length > 0 ? (
-        <div className="divide-y divide-ink-800">
+        <div className="divide-y divide-ink-200 dark:divide-ink-800">
           {deliveries.map((delivery) => (
             <div key={delivery.id} className="flex items-center justify-between gap-4 py-2.5 first:pt-0 last:pb-0">
               <div className="min-w-0">
@@ -333,9 +333,9 @@ function DeliveriesDialog({ webhook, onClose }: { webhook: Webhook; onClose: () 
                   <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${DELIVERY_TONE[delivery.status]}`}>
                     {delivery.status}
                   </span>
-                  <p className="truncate font-mono text-xs text-ink-200">{delivery.eventType}</p>
+                  <p className="truncate font-mono text-xs text-ink-800 dark:text-ink-200">{delivery.eventType}</p>
                 </div>
-                <p className="mt-0.5 text-xs text-ink-500">
+                <p className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">
                   {formatDate(delivery.createdAtUtc)}
                   {delivery.attempts > 0 ? ` · ${delivery.attempts} attempt${delivery.attempts === 1 ? '' : 's'}` : ''}
                   {delivery.lastResponseCode != null ? ` · HTTP ${delivery.lastResponseCode}` : ''}
@@ -345,7 +345,7 @@ function DeliveriesDialog({ webhook, onClose }: { webhook: Webhook; onClose: () 
           ))}
         </div>
       ) : (
-        <p className="text-sm text-ink-400">No deliveries yet.</p>
+        <p className="text-sm text-ink-500 dark:text-ink-400">No deliveries yet.</p>
       )}
     </Dialog>
   );

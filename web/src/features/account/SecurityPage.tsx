@@ -89,12 +89,12 @@ function MfaCard() {
         {user?.mfaEnabled ? <Badge tone="success" dot>Enabled</Badge> : <Badge tone="neutral" dot>Disabled</Badge>}
       </CardHeader>
       <CardContent className="space-y-4">
-        {errors.general && <p className="text-sm text-danger-500">{errors.general}</p>}
+        {errors.general && <p className="text-sm text-danger-700 dark:text-danger-500">{errors.general}</p>}
 
         {recoveryCodes && (
           <div className="rounded-lg border border-gold-400/30 bg-gold-400/5 p-4">
-            <p className="text-sm font-medium text-ink-100">Save your recovery codes</p>
-            <p className="mb-3 text-sm text-ink-400">Each can be used once if you lose your device. They won’t be shown again.</p>
+            <p className="text-sm font-medium text-ink-900 dark:text-ink-100">Save your recovery codes</p>
+            <p className="mb-3 text-sm text-ink-500 dark:text-ink-400">Each can be used once if you lose your device. They won’t be shown again.</p>
             <div className="grid grid-cols-2 gap-2 font-mono text-sm">
               {recoveryCodes.map((c) => (
                 <span key={c} className="rounded bg-ink-950 px-2 py-1 text-ink-200">{c}</span>
@@ -106,7 +106,7 @@ function MfaCard() {
 
         {!user?.mfaEnabled && !enrollment && !recoveryCodes && (
           <div className="flex items-center justify-between">
-            <p className="text-sm text-ink-500">Add a one-time code from an authenticator app at sign-in.</p>
+            <p className="text-sm text-ink-500 dark:text-ink-400">Add a one-time code from an authenticator app at sign-in.</p>
             <Button onClick={startEnroll} disabled={busy}>{busy ? 'Starting…' : 'Enable MFA'}</Button>
           </div>
         )}
@@ -120,9 +120,9 @@ function MfaCard() {
                 src={`data:image/png;base64,${enrollment.qrCodePngBase64}`}
               />
               <div className="space-y-2 text-sm">
-                <p className="text-ink-400">Scan the QR code, or enter this secret manually:</p>
+                <p className="text-ink-500 dark:text-ink-400">Scan the QR code, or enter this secret manually:</p>
                 <code className="block break-all rounded bg-ink-950 px-2 py-1 font-mono text-ink-200">{enrollment.secret}</code>
-                <p className="text-ink-400">Then enter the 6-digit code to confirm.</p>
+                <p className="text-ink-500 dark:text-ink-400">Then enter the 6-digit code to confirm.</p>
               </div>
             </div>
             <Field label="Code" htmlFor="mfa-code" error={errors.fields.code}>
@@ -185,8 +185,8 @@ function ChangePasswordCard() {
           <Field label="New password" htmlFor="new-pw" error={errors.fields.newPassword}>
             <Input id="new-pw" type="password" autoComplete="new-password" required value={next} onChange={(e) => setNext(e.target.value)} />
           </Field>
-          {errors.general && <p className="text-sm text-danger-500">{errors.general}</p>}
-          {done && <p className="text-sm text-success-600">Password updated. Other sessions were signed out.</p>}
+          {errors.general && <p className="text-sm text-danger-700 dark:text-danger-500">{errors.general}</p>}
+          {done && <p className="text-sm text-success-700 dark:text-success-500">Password updated. Other sessions were signed out.</p>}
           <Button type="submit" disabled={busy}>{busy ? 'Updating…' : 'Update password'}</Button>
         </form>
       </CardContent>
@@ -208,17 +208,17 @@ function SessionsCard() {
         </Button>
       </CardHeader>
       <CardContent className="space-y-2">
-        {isLoading && <p className="text-sm text-ink-400">Loading…</p>}
+        {isLoading && <p className="text-sm text-ink-500 dark:text-ink-400">Loading…</p>}
         {sessions?.map((s) => (
           <div key={s.id} className="flex items-center justify-between rounded-lg border px-4 py-3 dark:border-ink-800">
             <div className="flex items-center gap-3">
-              <Laptop className="size-4 text-ink-400" />
+              <Laptop className="size-4 text-ink-500 dark:text-ink-400" />
               <div className="text-sm">
                 <div className="flex items-center gap-2 text-ink-800 dark:text-ink-100">
                   {s.userAgent ? shorten(s.userAgent) : 'Unknown device'}
                   {s.isCurrent && <Badge tone="gold">This device</Badge>}
                 </div>
-                <div className="text-ink-400">
+                <div className="text-ink-500 dark:text-ink-400">
                   {s.ipAddress ?? 'unknown IP'} · last seen {new Date(s.lastSeenAtUtc).toLocaleString()}
                 </div>
               </div>

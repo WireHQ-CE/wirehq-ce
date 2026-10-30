@@ -178,7 +178,7 @@ export function ModulesPage() {
       <h2 className="mt-8 text-lg font-semibold text-ink-900 dark:text-ink-50">Activated modules</h2>
       {activated.isLoading ? (
         <Card className="mt-3">
-          <CardContent className="py-8 text-sm text-ink-400">Loading…</CardContent>
+          <CardContent className="py-8 text-sm text-ink-500 dark:text-ink-400">Loading…</CardContent>
         </Card>
       ) : modules.length === 0 ? (
         <Card className="mt-3">
@@ -208,9 +208,9 @@ export function ModulesPage() {
                       <h3 className="font-medium text-ink-900 dark:text-ink-50">{name}</h3>
                       {statusBadge(m)}
                     </div>
-                    <p className="mt-0.5 font-mono text-xs text-ink-400">
+                    <p className="mt-0.5 font-mono text-xs text-ink-500 dark:text-ink-400">
                       {m.slug}
-                      {mf && <span className="text-ink-500"> · v{mf.version}</span>}
+                      {mf && <span className="text-ink-500 dark:text-ink-400"> · v{mf.version}</span>}
                     </p>
                     {unlocked && (
                       <p className="mt-1 inline-flex items-center gap-1 text-xs text-success-700 dark:text-success-500">
@@ -259,14 +259,14 @@ export function ModulesPage() {
                 </div>
                 <h3 className="mt-3 font-medium text-ink-900 dark:text-ink-50">{m.name}</h3>
                 {mf && (
-                  <p className="mt-0.5 text-xs text-ink-400">
+                  <p className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">
                     v{mf.version} · {mf.tier}
                   </p>
                 )}
                 <p className="mt-1 flex-1 text-sm text-ink-500 dark:text-ink-400">{m.tagline}</p>
                 <div className="mt-4 flex items-center justify-between">
                   <span className="text-sm font-semibold text-ink-900 dark:text-ink-50">
-                    {formatModulePrice(m.price)} <span className="font-normal text-ink-400">one-off</span>
+                    {formatModulePrice(m.price)} <span className="font-normal text-ink-500 dark:text-ink-400">one-off</span>
                   </span>
                   <a href={`${MARKETPLACE_URL}/${m.slug}`} target="_blank" rel="noreferrer">
                     <Button variant="secondary" size="sm">

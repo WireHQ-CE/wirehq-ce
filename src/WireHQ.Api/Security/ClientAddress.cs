@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.AspNetCore.HttpOverrides;
-using IPNetwork = Microsoft.AspNetCore.HttpOverrides.IPNetwork;
+using IPNetwork = System.Net.IPNetwork;
 
 namespace WireHQ.Api.Security;
 
@@ -49,13 +49,13 @@ public static class ClientAddress
             // Walk the whole chain; the trust check below is what stops it.
             ForwardLimit = null,
         };
-        options.KnownNetworks.Clear();
+        options.KnownIPNetworks.Clear();
         options.KnownProxies.Clear();
 
         var configuredNetworks = Split(configuration[KnownNetworksKey]);
         foreach (var network in configuredNetworks.Count > 0 ? configuredNetworks : DefaultTrustedNetworks)
         {
-            options.KnownNetworks.Add(ParseNetwork(network));
+            options.KnownIPNetworks.Add(ParseNetwork(network));
         }
 
         foreach (var proxy in Split(configuration[KnownProxiesKey]))
@@ -98,22 +98,41 @@ public static class ClientAddress
 
     /// <summary>A human-readable summary of the trust set, for the boot log.</summary>
     public static string Describe(ForwardedHeadersOptions options) =>
-        string.Join(", ", options.KnownNetworks.Select(n => $"{n.Prefix}/{n.PrefixLength}")
+        string.Join(", ", options.KnownIPNetworks.Select(n => n.ToString())
             .Concat(options.KnownProxies.Select(p => p.ToString())));
 
+    /// <summary>
+    /// Parses a CIDR network, refusing a non-canonical base (host bits set, e.g. <c>10.0.0.5/8</c>): it is ambiguous
+    /// whether one host or the whole block was meant, and <see cref="IPNetwork.TryParse(string?, out IPNetwork)"/>
+    /// accepts it silently — so a typo would quietly widen or narrow the trusted range.
+    /// </summary>
     private static IPNetwork ParseNetwork(string cidr)
     {
         var slash = cidr.IndexOf('/');
         if (slash > 0
-            && IPAddress.TryParse(cidr[..slash], out var prefix)
-            && int.TryParse(cidr[(slash + 1)..], out var length)
-            && length >= 0
-            && length <= (prefix.AddressFamily == AddressFamily.InterNetworkV6 ? 128 : 32))
+            && IPAddress.TryParse(cidr[..slash], out var written)
+            && IPNetwork.TryParse(cidr, out var network)
+            && HasNoHostBits(written, network.PrefixLength))
         {
-            return new IPNetwork(prefix, length);
+            return network;
         }
 
-        throw new InvalidOperationException($"{KnownNetworksKey}: '{cidr}' is not a CIDR network (e.g. 10.0.0.0/8).");
+        throw new InvalidOperationException(
+            $"{KnownNetworksKey}: '{cidr}' is not a canonical CIDR network (e.g. 10.0.0.0/8).");
+    }
+
+    private static bool HasNoHostBits(IPAddress address, int prefixLength)
+    {
+        var bytes = address.GetAddressBytes();
+        for (var bit = prefixLength; bit < bytes.Length * 8; bit++)
+        {
+            if ((bytes[bit / 8] & (0x80 >> (bit % 8))) != 0)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static List<string> Split(string? value) =>

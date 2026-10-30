@@ -67,8 +67,8 @@ export function RichTextEditor({
             className={cn(
               'inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors',
               mode === 'source'
-                ? 'bg-gold-400/15 text-gold-700 dark:text-gold-300'
-                : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-800',
+                ? 'bg-gold-400/15 text-gold-800 dark:text-gold-300'
+                : 'text-ink-500 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-ink-800',
             )}
             aria-pressed={mode === 'source'}
           >

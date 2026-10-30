@@ -107,17 +107,17 @@ export function DeploymentPanel({ instanceId, canManage }: { instanceId: string;
       <CardContent className="space-y-4 pt-0">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
           <div className="flex items-center gap-2">
-            <Server className="size-4 text-ink-400" />
-            <span className="text-ink-500">Target</span>
+            <Server className="size-4 text-ink-500 dark:text-ink-400" />
+            <span className="text-ink-500 dark:text-ink-400">Target</span>
             {isSsh ? (
-              <span className="font-medium text-ink-800 dark:text-ink-100">SSH · {t?.sshTargetName ?? '—'} <span className="font-mono text-ink-400">({t?.interfaceName})</span></span>
+              <span className="font-medium text-ink-800 dark:text-ink-100">SSH · {t?.sshTargetName ?? '—'} <span className="font-mono text-ink-500 dark:text-ink-400">({t?.interfaceName})</span></span>
             ) : isAgent ? (
               <span className="font-medium text-ink-800 dark:text-ink-100">
-                Agent · {t?.agentName ?? '—'} <span className="font-mono text-ink-400">({t?.interfaceName})</span>
-                {t?.keyCustody === 'AgentManaged' && <span className="ml-1 text-ink-400">· agent-managed key</span>}
+                Agent · {t?.agentName ?? '—'} <span className="font-mono text-ink-500 dark:text-ink-400">({t?.interfaceName})</span>
+                {t?.keyCustody === 'AgentManaged' && <span className="ml-1 text-ink-500 dark:text-ink-400">· agent-managed key</span>}
               </span>
             ) : (
-              <span className="font-medium text-ink-800 dark:text-ink-100">Local <span className="text-ink-400">(config-only)</span></span>
+              <span className="font-medium text-ink-800 dark:text-ink-100">Local <span className="text-ink-500 dark:text-ink-400">(config-only)</span></span>
             )}
           </div>
           {activeJobId && active.data && (
@@ -129,13 +129,13 @@ export function DeploymentPanel({ instanceId, canManage }: { instanceId: string;
         </div>
 
         {!isSsh && !isAgent && (
-          <p className="rounded-md border border-ink-200 bg-ink-50 px-3 py-2 text-xs text-ink-500 dark:border-ink-800 dark:bg-ink-900">
+          <p className="rounded-md border border-ink-200 bg-ink-50 px-3 py-2 text-xs text-ink-500 dark:text-ink-400 dark:border-ink-800 dark:bg-ink-900">
             This instance is config-only — deploys are recorded but nothing is pushed. Bind it to an SSH target or an agent to deploy to a real host.
           </p>
         )}
 
         {isAgent && (
-          <p className="rounded-md border border-ink-200 bg-ink-50 px-3 py-2 text-xs text-ink-500 dark:border-ink-800 dark:bg-ink-900">
+          <p className="rounded-md border border-ink-200 bg-ink-50 px-3 py-2 text-xs text-ink-500 dark:text-ink-400 dark:border-ink-800 dark:bg-ink-900">
             Bound to an agent — a Deploy is queued and applied by the agent on its next outbound poll (no inbound access needed).
             {t?.agentKeyPending && ' This instance uses an agent-managed key — the agent generates it locally and reports the public key on the first successful deploy.'}
           </p>
@@ -160,14 +160,14 @@ export function DeploymentPanel({ instanceId, canManage }: { instanceId: string;
 
 function DeploymentHistory({ deployments, onView }: { deployments?: DeploymentSummary[]; onView: (id: string) => void }) {
   if (!deployments || deployments.length === 0) {
-    return <p className="text-sm text-ink-400">No deployments yet.</p>;
+    return <p className="text-sm text-ink-500 dark:text-ink-400">No deployments yet.</p>;
   }
 
   return (
     <div className="overflow-hidden rounded-md border dark:border-ink-800">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:border-ink-800">
+          <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-500 dark:text-ink-400 dark:border-ink-800">
             <th className="px-4 py-2 font-medium">Status</th>
             <th className="px-4 py-2 font-medium">When</th>
             <th className="px-4 py-2 font-medium">Detail</th>
@@ -178,8 +178,8 @@ function DeploymentHistory({ deployments, onView }: { deployments?: DeploymentSu
           {deployments.slice(0, 8).map((d) => (
             <tr key={d.id} className="border-b last:border-0 dark:border-ink-800">
               <td className="px-4 py-2"><Badge tone={statusTone[d.status]} dot>{d.status}</Badge></td>
-              <td className="px-4 py-2 text-ink-500">{new Date(d.createdAtUtc).toLocaleString()}</td>
-              <td className="px-4 py-2 max-w-[16rem] truncate text-ink-400" title={d.error ?? ''}>{d.error ?? '—'}</td>
+              <td className="px-4 py-2 text-ink-500 dark:text-ink-400">{new Date(d.createdAtUtc).toLocaleString()}</td>
+              <td className="px-4 py-2 max-w-[16rem] truncate text-ink-500 dark:text-ink-400" title={d.error ?? ''}>{d.error ?? '—'}</td>
               <td className="px-4 py-2 text-right">
                 <Button variant="ghost" size="sm" onClick={() => onView(d.id)}>View</Button>
               </td>
@@ -276,7 +276,7 @@ function BindTargetDialog({
         </Field>
         {kind === 'Agent' && (
           noAgents ? (
-            <p className="text-sm text-ink-500">No active agents — enroll one under WireGuard → Agents first.</p>
+            <p className="text-sm text-ink-500 dark:text-ink-400">No active agents — enroll one under WireGuard → Agents first.</p>
           ) : (
             <>
               <Field label="Agent" htmlFor="bt-agent" error={errors.fields.agentId}>
@@ -296,7 +296,7 @@ function BindTargetDialog({
                   <option value="AgentManaged">Agent-managed (key never leaves the host)</option>
                 </Select>
               </Field>
-              <p className="text-xs text-ink-500">
+              <p className="text-xs text-ink-500 dark:text-ink-400">
                 {keyCustody === 'AgentManaged'
                   ? 'The agent generates the interface key locally and reports only the public key on the first deploy. WireHQ cannot export the full server config for this instance.'
                   : 'WireHQ generates and holds the interface key (encrypted), so full server-config and QR exports stay available.'}
@@ -306,7 +306,7 @@ function BindTargetDialog({
         )}
         {kind === 'Ssh' && (
           noTargets ? (
-            <p className="text-sm text-ink-500">No SSH targets yet — register one under WireGuard → Targets first.</p>
+            <p className="text-sm text-ink-500 dark:text-ink-400">No SSH targets yet — register one under WireGuard → Targets first.</p>
           ) : (
             <>
               <Field label="SSH target" htmlFor="bt-ssh" error={errors.fields.sshTargetId}>
@@ -327,7 +327,7 @@ function BindTargetDialog({
           <div className="flex items-center justify-between gap-4 rounded-md border border-ink-200 px-3 py-2.5 dark:border-ink-800">
             <div>
               <label htmlFor="bt-autoreconverge" className="text-sm font-medium text-ink-700 dark:text-ink-200">Auto re-converge on drift</label>
-              <p className="text-xs text-ink-500">
+              <p className="text-xs text-ink-500 dark:text-ink-400">
                 {canAutoReconverge
                   ? "Automatically redeploy when the deployed config drifts from WireHQ's desired state."
                   : 'Automatically redeploy on drift — included in Pro and Enterprise plans.'}
@@ -362,8 +362,8 @@ function DeploymentDetailDialog({ jobId, onClose }: { jobId: string; onClose: ()
               <div className="mt-1 size-2 shrink-0 rounded-full bg-gold-400" />
               <div>
                 <div className="text-sm font-medium capitalize text-ink-800 dark:text-ink-100">{e.phase.replace(/_/g, ' ')}</div>
-                {e.detail && <div className="text-xs text-ink-500">{e.detail}</div>}
-                <div className="text-xs text-ink-400">{new Date(e.atUtc).toLocaleString()}</div>
+                {e.detail && <div className="text-xs text-ink-500 dark:text-ink-400">{e.detail}</div>}
+                <div className="text-xs text-ink-500 dark:text-ink-400">{new Date(e.atUtc).toLocaleString()}</div>
               </div>
             </li>
           ))}

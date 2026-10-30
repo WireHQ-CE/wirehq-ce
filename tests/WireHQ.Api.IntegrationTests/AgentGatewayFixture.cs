@@ -18,8 +18,7 @@ namespace WireHQ.Api.IntegrationTests;
 /// </summary>
 public sealed class AgentGatewayFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .WithDatabase("wirehq")
         .WithUsername("wirehq")
         .WithPassword("wirehq")
@@ -165,7 +164,7 @@ public sealed class AgentGatewayFixture : IAsyncLifetime
             throw new InvalidOperationException("Could not locate the repository root (WireHQ.sln).");
         }
 
-        var apiDirectory = Path.Combine(root.FullName, "src", "WireHQ.Api", "bin", configuration, "net9.0");
+        var apiDirectory = Path.Combine(root.FullName, "src", "WireHQ.Api", "bin", configuration, "net10.0");
         return (apiDirectory, Path.Combine(apiDirectory, "WireHQ.Api.dll"));
     }
 

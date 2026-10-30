@@ -35,8 +35,8 @@ export function ForgotPasswordPage() {
       }
     >
       {sent ? (
-        <p className="text-sm text-ink-300">
-          If an account exists for <span className="font-medium text-ink-100">{email}</span>, a
+        <p className="text-sm text-ink-700 dark:text-ink-300">
+          If an account exists for <span className="font-medium text-ink-900 dark:text-ink-100">{email}</span>, a
           password-reset link is on its way. The link is valid for one hour.
         </p>
       ) : (

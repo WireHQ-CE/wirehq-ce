@@ -20,7 +20,7 @@ import {
 
 const STATUS_TONE: Record<ApiKey['status'], string> = {
   Active: 'bg-success-500/15 text-success-700 dark:text-success-400',
-  Expired: 'bg-gold-500/15 text-gold-700 dark:text-gold-400',
+  Expired: 'bg-gold-500/15 text-gold-800 dark:text-gold-400',
   Revoked: 'bg-danger-500/15 text-danger-600 dark:text-danger-400',
 };
 
@@ -51,8 +51,8 @@ export function ApiKeysSettingsPage() {
         <PageHeader title="API keys" subtitle="Programmatic access to the WireHQ API." />
         <Card className="max-w-2xl">
           <CardContent>
-            <p className="text-sm text-ink-400">
-              API keys are an <span className="font-medium text-ink-200">Enterprise</span> feature. Contact sales to
+            <p className="text-sm text-ink-500 dark:text-ink-400">
+              API keys are an <span className="font-medium text-ink-800 dark:text-ink-200">Enterprise</span> feature. Contact sales to
               enable programmatic API access for your organization.
             </p>
           </CardContent>
@@ -78,13 +78,13 @@ export function ApiKeysSettingsPage() {
       />
 
       {isLoading ? (
-        <p className="text-sm text-ink-400">Loading…</p>
+        <p className="text-sm text-ink-500 dark:text-ink-400">Loading…</p>
       ) : (
         <div className="max-w-3xl">
           <Card>
             <CardContent>
               {keys && keys.length > 0 ? (
-                <div className="divide-y divide-ink-800">
+                <div className="divide-y divide-ink-200 dark:divide-ink-800">
                   {keys.map((key) => (
                     <ApiKeyRow key={key.id} apiKey={key}>
                       {canManage && (
@@ -96,7 +96,7 @@ export function ApiKeysSettingsPage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-ink-400">
+                <p className="text-sm text-ink-500 dark:text-ink-400">
                   No API keys yet.{canManage ? ' Create one to let a script or service call the API.' : ''}
                 </p>
               )}
@@ -121,13 +121,13 @@ function ApiKeyRow({ apiKey, children }: { apiKey: ApiKey; children: ReactNode }
     <div className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <p className="truncate text-sm font-medium text-ink-100">{apiKey.name}</p>
+          <p className="truncate text-sm font-medium text-ink-900 dark:text-ink-100">{apiKey.name}</p>
           <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_TONE[apiKey.status]}`}>
             {apiKey.status}
           </span>
         </div>
-        <p className="mt-0.5 font-mono text-xs text-ink-400">{apiKey.keyPrefix}…</p>
-        <p className="mt-0.5 text-xs text-ink-500">{meta}</p>
+        <p className="mt-0.5 font-mono text-xs text-ink-500 dark:text-ink-400">{apiKey.keyPrefix}…</p>
+        <p className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">{meta}</p>
       </div>
       {children}
     </div>
@@ -188,7 +188,7 @@ function CreateKeyDialog({ onClose }: { onClose: () => void }) {
         footer={<Button onClick={onClose}>Done</Button>}
       >
         <div className="space-y-3">
-          <div className="rounded-md border border-gold-500/40 bg-gold-500/5 p-3 text-sm text-ink-300">
+          <div className="rounded-md border border-gold-500/40 bg-gold-500/5 p-3 text-sm text-ink-700 dark:text-ink-300">
             This is the only time the secret is displayed. Store it somewhere safe (a secrets manager) and send it as
             an <code className="font-mono text-xs">X-Api-Key</code> header or a <code className="font-mono text-xs">Bearer</code>{' '}
             token. If you lose it, revoke this key and create a new one.
@@ -244,10 +244,10 @@ function CreateKeyDialog({ onClose }: { onClose: () => void }) {
         </Field>
 
         <div className="space-y-4">
-          <p className="text-sm font-medium text-ink-200">Scopes</p>
+          <p className="text-sm font-medium text-ink-800 dark:text-ink-200">Scopes</p>
           {grouped.map(([group, options]) => (
             <div key={group} className="space-y-1.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">{group}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-500 dark:text-ink-400">{group}</p>
               {options.map((option) => {
                 // Mirror the server's escalation guard: you can grant only scopes you hold yourself.
                 const disabled = !hasPermission(option.key) && !selected.has(option.key);
@@ -261,8 +261,8 @@ function CreateKeyDialog({ onClose }: { onClose: () => void }) {
                       onChange={() => toggle(option.key)}
                     />
                     <span>
-                      <span className="text-ink-200">{option.description}</span>
-                      <span className="ml-1 text-xs text-ink-500">({option.key})</span>
+                      <span className="text-ink-800 dark:text-ink-200">{option.description}</span>
+                      <span className="ml-1 text-xs text-ink-500 dark:text-ink-400">({option.key})</span>
                     </span>
                   </label>
                 );

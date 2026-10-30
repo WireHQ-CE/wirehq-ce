@@ -8,6 +8,7 @@ import { Field, Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { ApiError } from '@/lib/api/client';
 import { config } from '@/app/config';
+import { useAuthStore } from '@/stores/auth-store';
 import {
   useBrandingSettings,
   useUpdateBranding,
@@ -17,13 +18,16 @@ import {
 } from './branding-api';
 
 // The Settings → Branding console (docs/34) — the install-global brand: product name, accent colour, and logo/favicon
-// images. Super-Admin only (the endpoints are platform-scoped). Every change re-applies to the running shell live.
+// images. Needs the branding.manage permission AND the branding.basic feature, which only an activated Branding module
+// grants (no plan does, so it is inert on SaaS — docs/34 BR-12). Without both, the page explains rather than firing a
+// request that can only 403. Every change re-applies to the running shell live.
 
 const DEFAULT_COLOR = '#f5b301';
 
 export function BrandingPage() {
   const toast = useToast();
-  const settings = useBrandingSettings();
+  const available = useAuthStore((s) => s.hasPermission('branding.manage') && s.hasFeature('branding.basic'));
+  const settings = useBrandingSettings(available);
   const update = useUpdateBranding();
 
   const [productName, setProductName] = useState('');
@@ -46,6 +50,22 @@ export function BrandingPage() {
         onSuccess: () => toast('Branding saved.'),
         onError: (e) => fail(e, 'Could not save branding.'),
       },
+    );
+  }
+
+  if (!available) {
+    return (
+      <>
+        <PageHeader title="Branding" subtitle="Make this instance your own — your product name, colour and logo." />
+        <Card className="max-w-2xl">
+          <CardContent>
+            <p className="text-sm text-ink-500 dark:text-ink-400">
+              Branding is a <span className="font-medium text-ink-800 dark:text-ink-200">self-hosted</span> feature: it rebrands the
+              whole install, so an organization admin turns it on by activating the Branding module.
+            </p>
+          </CardContent>
+        </Card>
+      </>
     );
   }
 
@@ -137,7 +157,7 @@ export function BrandingPage() {
         </CardContent>
       </Card>
 
-      <p className="mt-4 flex items-center gap-2 text-xs text-ink-400">
+      <p className="mt-4 flex items-center gap-2 text-xs text-ink-500 dark:text-ink-400">
         <Palette className="size-3.5" /> Changes apply to everyone immediately. Logos fall back to the WireHQ mark when
         cleared.
       </p>
@@ -191,7 +211,7 @@ function AssetUpload({
         {previewUrl ? (
           <img src={previewUrl} alt={`${label} preview`} className="max-h-full max-w-full object-contain p-3" />
         ) : (
-          <span className="text-xs text-ink-400">No image — using the WireHQ mark</span>
+          <span className="text-xs text-ink-500 dark:text-ink-400">No image — using the WireHQ mark</span>
         )}
       </div>
       <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={onPick} />
@@ -215,7 +235,7 @@ function AssetUpload({
           </Button>
         )}
       </div>
-      <p className="text-[11px] text-ink-400">{hint}</p>
+      <p className="text-[11px] text-ink-500 dark:text-ink-400">{hint}</p>
     </div>
   );
 }

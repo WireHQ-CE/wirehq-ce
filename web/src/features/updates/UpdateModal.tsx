@@ -66,7 +66,7 @@ export function UpdateModal({ status, onClose }: { status: UpdateStatus; onClose
 
         {status.summary && (
           <div className="rounded-md border border-ink-200 bg-ink-50 p-3 text-xs text-ink-600 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-300">
-            <span className="font-medium text-ink-500">Release note:</span> {status.summary}
+            <span className="font-medium text-ink-500 dark:text-ink-400">Release note:</span> {status.summary}
           </div>
         )}
 
@@ -78,16 +78,16 @@ export function UpdateModal({ status, onClose }: { status: UpdateStatus; onClose
         )}
 
         <div>
-          <p className="mb-1 text-ink-500">
+          <p className="mb-1 text-ink-500 dark:text-ink-400">
             {isCommunity ? 'From the folder where WireHQ is installed, run:' : 'Run this from the host with shell access:'}
           </p>
           <div className="flex items-center justify-between gap-2 rounded-md bg-ink-900 px-3 py-2 font-mono text-xs text-ink-50">
             <code className="select-all">{command}</code>
-            <button onClick={copy} className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-ink-300 hover:bg-ink-700" aria-label="Copy command">
+            <button onClick={copy} className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-ink-700 dark:text-ink-300 hover:bg-ink-700" aria-label="Copy command">
               {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
             </button>
           </div>
-          <p className="mt-1 text-xs text-ink-400">
+          <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
             {isCommunity
               ? 'This rebuilds from the new source and applies any migrations via a one-shot job, preserving your data — WireHQ does not update itself.'
               : 'This backs up, runs migrations, and rolls the images — WireHQ does not update itself.'}
@@ -103,11 +103,11 @@ export function UpdateModal({ status, onClose }: { status: UpdateStatus; onClose
 
         <div className="flex items-center justify-between pt-1">
           {status.releaseUrl && (
-            <a href={status.releaseUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-gold-600 hover:underline dark:text-gold-400">
+            <a href={status.releaseUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-gold-800 hover:underline dark:text-gold-400">
               Release notes <ExternalLink className="size-3.5" />
             </a>
           )}
-          {checked && <span className="text-xs text-ink-400">Last checked {checked}</span>}
+          {checked && <span className="text-xs text-ink-500 dark:text-ink-400">Last checked {checked}</span>}
         </div>
 
         <div className="flex justify-end pt-2">

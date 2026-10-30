@@ -58,7 +58,7 @@ export function PeerConfigDialog({ peer, onClose }: { peer: PeerListItem; onClos
               <img src={qrUrl} alt="WireGuard config QR code" className="size-44 shrink-0 rounded-md border bg-white p-1 dark:border-ink-700" />
             )}
             <div className="flex-1">
-              <p className="text-sm text-ink-500">Scan with the WireGuard mobile app, or download the <code>.conf</code> for desktop.</p>
+              <p className="text-sm text-ink-500 dark:text-ink-400">Scan with the WireGuard mobile app, or download the <code>.conf</code> for desktop.</p>
               <Button variant="secondary" size="sm" className="mt-2" onClick={() => downloadText(confFilename(peer.name), config)}>
                 <Download /> Download .conf
               </Button>
@@ -68,20 +68,20 @@ export function PeerConfigDialog({ peer, onClose }: { peer: PeerListItem; onClos
           <CodeBlock content={config} />
 
           <div>
-            <h4 className="mb-1.5 text-xs font-medium uppercase tracking-wide text-ink-500">Config history</h4>
+            <h4 className="mb-1.5 text-xs font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">Config history</h4>
             <div className="space-y-1">
               {versions.data?.length ? (
                 versions.data.map((v) => (
                   <div key={v.version} className="flex items-center justify-between rounded-md border px-3 py-1.5 text-sm dark:border-ink-800">
                     <span className="flex items-center gap-2">
                       <Badge tone="neutral">v{v.version}</Badge>
-                      <span className="text-ink-500">{v.note ?? '—'}</span>
+                      <span className="text-ink-500 dark:text-ink-400">{v.note ?? '—'}</span>
                     </span>
-                    <span className="font-mono text-xs text-ink-400" title={v.checksum}>{v.checksum.slice(0, 12)}…</span>
+                    <span className="font-mono text-xs text-ink-500 dark:text-ink-400" title={v.checksum}>{v.checksum.slice(0, 12)}…</span>
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-ink-400">No version history.</p>
+                <p className="text-sm text-ink-500 dark:text-ink-400">No version history.</p>
               )}
             </div>
           </div>

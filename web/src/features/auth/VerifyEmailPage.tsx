@@ -42,12 +42,12 @@ export function VerifyEmailPage() {
       )}
       {status === 'success' && (
         <div className="space-y-4">
-          <p className="text-sm text-ink-300">Thanks — your email address is now verified. You can use all of WireHQ.</p>
+          <p className="text-sm text-ink-700 dark:text-ink-300">Thanks — your email address is now verified. You can use all of WireHQ.</p>
           <Button className="w-full" onClick={() => navigate('/app')}>Go to WireHQ</Button>
         </div>
       )}
       {status === 'error' && (
-        <p className="text-sm text-danger-500">{message}</p>
+        <p className="text-sm text-danger-700 dark:text-danger-500">{message}</p>
       )}
     </AuthLayout>
   );

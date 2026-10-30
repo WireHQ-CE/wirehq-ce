@@ -412,6 +412,13 @@ export function useMintEnrollToken() {
   });
 }
 
+/** A single-use token that re-issues an EXISTING agent's certificate (keeps its id + instance bindings). */
+export function useMintRekeyToken() {
+  return useMutation({
+    mutationFn: (agentId: string) => api.post<MintEnrollTokenResult>(`${agentsBase}/${agentId}/rekey-tokens`, {}),
+  });
+}
+
 function useAgentLifecycle(action: 'disable' | 'reactivate' | 'revoke') {
   const qc = useQueryClient();
   return useMutation({

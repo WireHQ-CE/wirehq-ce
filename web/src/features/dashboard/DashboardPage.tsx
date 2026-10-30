@@ -67,7 +67,7 @@ export function DashboardPage() {
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle>Fleet activity</CardTitle>
             {canSeeFleet && (fleet.data?.instances.length ?? 0) > 0 && (
-              <Link to="/app/wireguard" className="inline-flex items-center gap-1 text-sm font-medium text-gold-600 hover:underline dark:text-gold-400">
+              <Link to="/app/wireguard" className="inline-flex items-center gap-1 text-sm font-medium text-gold-800 hover:underline dark:text-gold-400">
                 View fleet <ArrowRight className="size-3.5" />
               </Link>
             )}
@@ -189,15 +189,15 @@ function InstanceRow({ instance: i }: { instance: FleetInstance }) {
           {i.hasDrift && <Badge tone="warning">Drift</Badge>}
           <span className="truncate font-medium text-ink-800 dark:text-ink-100">{i.name}</span>
         </div>
-        <div className="mt-0.5 truncate text-xs text-ink-400">
+        <div className="mt-0.5 truncate text-xs text-ink-500 dark:text-ink-400">
           {i.networkName ?? 'No network'} · {i.targetKind}
         </div>
       </div>
       <div className="shrink-0 text-right">
         <div className="tabular-nums text-ink-700 dark:text-ink-200">
-          {i.peersConnected}<span className="text-ink-400">/{i.peersTotal} peers</span>
+          {i.peersConnected}<span className="text-ink-500 dark:text-ink-400">/{i.peersTotal} peers</span>
         </div>
-        <div className="text-xs text-ink-400">
+        <div className="text-xs text-ink-500 dark:text-ink-400">
           {i.peersTotal === 0 ? '—' : `↓ ${formatBytes(i.rxBytes)} · ↑ ${formatBytes(i.txBytes)}`}
         </div>
       </div>
@@ -218,7 +218,7 @@ function MiniStat({
 }) {
   return (
     <div className="rounded-lg border border-ink-200 px-3 py-2 dark:border-ink-800">
-      <div className="flex items-center gap-1.5 text-xs text-ink-400">
+      <div className="flex items-center gap-1.5 text-xs text-ink-500 dark:text-ink-400">
         <Icon className="size-3.5" /> {label}
       </div>
       <div className={`mt-1 text-lg font-semibold tabular-nums ${tone === 'warning' ? 'text-warning-700 dark:text-warning-500' : 'text-ink-900 dark:text-ink-50'}`}>
@@ -231,7 +231,7 @@ function MiniStat({
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-ink-500">{label}</span>
+      <span className="text-ink-500 dark:text-ink-400">{label}</span>
       <span className="text-ink-800 dark:text-ink-200">{value}</span>
     </div>
   );

@@ -144,7 +144,7 @@ function PeerResult({ result, name, onClose }: { result: CreatePeerResponse; nam
               />
             )}
             <div className="flex-1">
-              <p className="text-sm text-ink-500">Scan with the WireGuard mobile app, or download the <code>.conf</code> for desktop.</p>
+              <p className="text-sm text-ink-500 dark:text-ink-400">Scan with the WireGuard mobile app, or download the <code>.conf</code> for desktop.</p>
               <Button variant="secondary" size="sm" className="mt-2" onClick={() => downloadText(confFilename(name), result.config!)}>
                 <Download /> Download .conf
               </Button>
@@ -153,7 +153,7 @@ function PeerResult({ result, name, onClose }: { result: CreatePeerResponse; nam
           <CodeBlock content={result.config} />
         </div>
       ) : (
-        <p className="text-sm text-ink-500">
+        <p className="text-sm text-ink-500 dark:text-ink-400">
           This peer uses a client-supplied public key, so the server can't render a full config. Configure the
           client with its own private key, the server's public key, and address <span className="font-mono">{result.assignedAddress}</span>.
         </p>
@@ -183,7 +183,7 @@ function Toggle({
       />
       <span>
         <span className="text-sm font-medium text-ink-800 dark:text-ink-100">{label}</span>
-        {hint && <span className="mt-0.5 block text-xs text-ink-500">{hint}</span>}
+        {hint && <span className="mt-0.5 block text-xs text-ink-500 dark:text-ink-400">{hint}</span>}
       </span>
     </label>
   );

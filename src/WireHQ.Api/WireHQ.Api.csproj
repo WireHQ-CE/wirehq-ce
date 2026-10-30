@@ -5,7 +5,7 @@
     the module abstractions. Builds the HTTP pipeline and wires everything together.
   -->
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>WireHQ.Api</RootNamespace>
     <UserSecretsId>wirehq-api</UserSecretsId>
     <!-- The XML doc file feeds the generated OpenAPI reference (docs/27); CS1591 is NoWarn'd repo-wide. -->
@@ -31,7 +31,6 @@
     <PackageReference Include="Asp.Versioning.Mvc" />
     <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" />

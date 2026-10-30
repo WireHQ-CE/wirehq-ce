@@ -8,8 +8,8 @@ using WireHQ.Domain.Platform;
 namespace WireHQ.Api.Controllers.V1;
 
 /// <summary>
-/// The install-global branding surface (docs/34). Operator endpoints (Super-Admin, enforced by the platform-request
-/// pipeline) read/write the brand and manage the logo/favicon images; the anonymous <c>GET /api/v1/branding</c> is what
+/// The install-global branding surface (docs/34). Operator endpoints (the <c>branding.manage</c> permission + the
+/// <c>branding.basic</c> feature, enforced by the request pipeline; inert on SaaS, where no plan grants it) read/write the brand and manage the logo/favicon images; the anonymous <c>GET /api/v1/branding</c> is what
 /// the browser shell reads pre-login; the anonymous, content-addressed <c>assets/{id}</c> serve is <b>hardened at the
 /// API layer</b> (sandbox CSP + nosniff + canonical content type, never relying on nginx). Kept-core — the CE console
 /// drives it once the <c>branding.basic</c> module is activated. (docs/34 §4, ADR-049, BR-16)
@@ -61,13 +61,13 @@ public sealed class BrandingController : ApiControllerBase
         return File(result.Value.Bytes, result.Value.ContentType);
     }
 
-    /// <summary>Read the current brand settings for the operator console (Super-Admin).</summary>
+    /// <summary>Read the current brand settings for the operator console (branding.manage).</summary>
     [HttpGet("settings")]
     [Authorize]
     public async Task<IActionResult> Get(CancellationToken cancellationToken) =>
         Ok(await Sender.Send(new GetBrandingQuery(), cancellationToken));
 
-    /// <summary>Update the product name + brand colour (Super-Admin).</summary>
+    /// <summary>Update the product name + brand colour (branding.manage).</summary>
     [HttpPut("settings")]
     [Authorize]
     public async Task<IActionResult> Update(UpdateBrandingRequest request, CancellationToken cancellationToken) =>
@@ -92,7 +92,7 @@ public sealed class BrandingController : ApiControllerBase
         return result.IsFailure ? Problem(result.Error) : Ok(new { assetId = result.Value });
     }
 
-    /// <summary>Remove a brand image, reverting the slot to the shipped WireHQ mark (Super-Admin).</summary>
+    /// <summary>Remove a brand image, reverting the slot to the shipped WireHQ mark (branding.manage).</summary>
     [HttpDelete("assets/{kind}")]
     [Authorize]
     public async Task<IActionResult> Remove(string kind, CancellationToken cancellationToken)

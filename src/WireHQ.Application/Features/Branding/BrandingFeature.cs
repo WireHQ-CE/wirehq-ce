@@ -12,8 +12,9 @@ using WireHQ.Shared.Results;
 
 namespace WireHQ.Application.Features.Branding;
 
-// Operator branding config (docs/34) — the install-global product name + brand colour. Super-Admin read/write
-// (IPlatformRequest); logo/favicon images are handled by BrandAssetFeature. The public, anonymous read
+// Operator branding config (docs/34) — the install-global product name + brand colour. Read/write needs the
+// branding.manage permission + the branding.basic feature (NOT IPlatformRequest — the CE has no platform tier,
+// BR-12); logo/favicon images are handled by BrandAssetFeature. The public, anonymous read
 // (PublicBrandingQuery) is what the browser shell fetches pre-login: it is gated on the branding.basic entitlement via
 // the install-global activated-module union (edition = CommunityEdition — no base plan grants branding, so an
 // unentitled install, including every SaaS org, resolves to the shipped WireHQ brand). This whole area is kept-core.

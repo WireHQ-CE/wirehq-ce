@@ -13,7 +13,7 @@ namespace WireHQ.Api.Persistence;
 /// it can include the feature modules' model contributors — without them the generated migration
 /// would miss module schemas (e.g. <c>wg</c>). Add a module's contributor here when it ships.
 ///
-/// Add a migration (run from the repo root, with the .NET SDK available — e.g. in the sdk:9.0 container):
+/// Add a migration (run from the repo root, with the .NET SDK available — e.g. in the sdk:10.0 container):
 ///   dotnet ef migrations add &lt;Name&gt; -p src/WireHQ.Infrastructure -s src/WireHQ.Api -o Persistence/Migrations
 ///
 /// This factory drives the SaaS chain. The Community Edition keeps its OWN chain and is NOT generated

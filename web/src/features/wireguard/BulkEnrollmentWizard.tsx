@@ -149,11 +149,11 @@ export function BulkEnrollmentWizard({ instanceId, onClose }: { instanceId: stri
           onClick={() => fileInput.current?.click()}
           className="flex w-full flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-8 text-center transition-colors hover:border-gold-400 hover:bg-gold-50/50 dark:border-ink-700 dark:hover:bg-gold-400/5"
         >
-          <FileUp className="size-7 text-ink-400" />
+          <FileUp className="size-7 text-ink-500 dark:text-ink-400" />
           <span className="text-sm font-medium text-ink-700 dark:text-ink-200">
             {file ? file.name : 'Choose a CSV file'}
           </span>
-          <span className="text-xs text-ink-500">{file ? 'Click to choose a different file' : 'or click to browse'}</span>
+          <span className="text-xs text-ink-500 dark:text-ink-400">{file ? 'Click to choose a different file' : 'or click to browse'}</span>
         </button>
         <input
           ref={fileInput}
@@ -163,14 +163,14 @@ export function BulkEnrollmentWizard({ instanceId, onClose }: { instanceId: stri
           onChange={(e) => { setFile(e.target.files?.[0] ?? null); setError(null); }}
         />
 
-        <div className="rounded-md border px-3 py-2.5 text-xs text-ink-500 dark:border-ink-800">
+        <div className="rounded-md border px-3 py-2.5 text-xs text-ink-500 dark:text-ink-400 dark:border-ink-800">
           <p className="mb-1 font-medium text-ink-700 dark:text-ink-200">Columns (header row required, case-insensitive)</p>
           <p>
             <span className="font-mono text-ink-700 dark:text-ink-200">Name</span>*,{' '}
             <span className="font-mono text-ink-700 dark:text-ink-200">Email</span>*, Department, DeviceType,
             AssignedAddress, AllowedIPs. Keys, addresses and configs are generated for you.
           </p>
-          <Button variant="ghost" size="sm" className="mt-2 px-0 text-gold-600 hover:text-gold-700 dark:text-gold-400" onClick={() => downloadText('wirehq-enrollment-template.csv', TEMPLATE)}>
+          <Button variant="ghost" size="sm" className="mt-2 px-0 text-gold-800 hover:text-gold-800 dark:text-gold-400" onClick={() => downloadText('wirehq-enrollment-template.csv', TEMPLATE)}>
             <Upload className="rotate-180" /> Download template
           </Button>
         </div>
@@ -195,7 +195,7 @@ function OutcomeTable({ rows }: { rows: OutcomeRow[] }) {
     <div className="max-h-[50vh] overflow-y-auto rounded-md border dark:border-ink-800">
       <table className="w-full text-sm">
         <thead className="sticky top-0 bg-ink-50 dark:bg-ink-900">
-          <tr className="text-left text-xs uppercase tracking-wide text-ink-500">
+          <tr className="text-left text-xs uppercase tracking-wide text-ink-500 dark:text-ink-400">
             <th className="px-3 py-2 font-medium">#</th>
             <th className="px-3 py-2 font-medium">Name</th>
             <th className="px-3 py-2 font-medium">Address</th>
@@ -205,15 +205,15 @@ function OutcomeTable({ rows }: { rows: OutcomeRow[] }) {
         <tbody>
           {rows.map((r) => (
             <tr key={r.rowNumber} className="border-t align-top dark:border-ink-800">
-              <td className="px-3 py-2 text-ink-400">{r.rowNumber}</td>
+              <td className="px-3 py-2 text-ink-500 dark:text-ink-400">{r.rowNumber}</td>
               <td className="px-3 py-2">
                 <div className="font-medium text-ink-800 dark:text-ink-100">{r.name ?? '—'}</div>
-                {r.email && <div className="text-xs text-ink-400">{r.email}</div>}
+                {r.email && <div className="text-xs text-ink-500 dark:text-ink-400">{r.email}</div>}
               </td>
-              <td className="px-3 py-2 font-mono text-ink-500">{r.assignedAddress ?? '—'}</td>
+              <td className="px-3 py-2 font-mono text-ink-500 dark:text-ink-400">{r.assignedAddress ?? '—'}</td>
               <td className="px-3 py-2">
                 <Badge tone={outcomeTone[r.outcome] ?? 'neutral'}>{r.outcome}</Badge>
-                {r.reason && <div className="mt-0.5 text-xs text-ink-400">{r.reason}</div>}
+                {r.reason && <div className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">{r.reason}</div>}
               </td>
             </tr>
           ))}

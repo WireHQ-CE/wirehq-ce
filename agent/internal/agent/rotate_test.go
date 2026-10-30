@@ -384,3 +384,44 @@ func TestRecoveryDiscardsATornStagingWriteAndKeepsTheLiveIdentity(t *testing.T) 
 		}
 	}
 }
+
+func TestARunningAgentAdoptsAnIdentityReKeyedOnDiskByAnotherProcess(t *testing.T) {
+	g := newFakeGateway(t)
+	cfg, oldFP := g.enrolledState(46 * day) // expired: the gateway would refuse it
+	loop, err := NewLoop(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// An operator re-keys while the service is running: `wirehq-agent enroll` rewrites the identity on disk.
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	keyDER, _ := x509.MarshalPKCS8PrivateKey(key)
+	mustWrite(t, cfg.keyPath(), pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER}))
+	mustWrite(t, cfg.certPath(), []byte(g.issue(&key.PublicKey, time.Now(), g.lifetime)))
+	newFP := fingerprintOfFile(t, cfg.certPath())
+
+	loop.Once(context.Background())
+
+	if g.lastSeen() != newFP || newFP == oldFP {
+		t.Fatal("the running agent kept presenting the certificate the re-key replaced")
+	}
+}
+
+func TestAHalfWrittenIdentityOnDiskIsNotAdopted(t *testing.T) {
+	g := newFakeGateway(t)
+	cfg, oldFP := g.enrolledState(day)
+	loop, err := NewLoop(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Only the key has been replaced so far — the pair no longer matches.
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	keyDER, _ := x509.MarshalPKCS8PrivateKey(key)
+	mustWrite(t, cfg.keyPath(), pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER}))
+
+	loop.Once(context.Background())
+
+	if g.lastSeen() != oldFP {
+		t.Fatal("a mismatched key + cert pair must not be adopted")
+	}
+}

@@ -6,7 +6,7 @@
     signal the type belongs in a different layer.
   -->
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>WireHQ.Shared</RootNamespace>
   </PropertyGroup>
 

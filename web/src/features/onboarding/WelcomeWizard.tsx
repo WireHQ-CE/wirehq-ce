@@ -96,11 +96,11 @@ export function WelcomeWizard() {
   return (
     <div className="mx-auto max-w-2xl py-6">
       <div className="mb-6 text-center">
-        <span className="mb-3 inline-flex items-center gap-2 rounded-full border border-gold-400/30 bg-gold-400/10 px-3 py-1 text-xs font-medium text-gold-700 dark:text-gold-300">
+        <span className="mb-3 inline-flex items-center gap-2 rounded-full border border-gold-400/30 bg-gold-400/10 px-3 py-1 text-xs font-medium text-gold-800 dark:text-gold-300">
           <Sparkles className="size-3.5" /> Welcome{user?.firstName ? `, ${user.firstName}` : ''}
         </span>
         <h1 className="text-h1 text-ink-900 dark:text-ink-50">Tell us about your deployment</h1>
-        <p className="mx-auto mt-2 max-w-md text-base text-ink-500">
+        <p className="mx-auto mt-2 max-w-md text-base text-ink-500 dark:text-ink-400">
           A few optional questions help us tailor WireHQ to you. You can skip this and do it later.
         </p>
       </div>

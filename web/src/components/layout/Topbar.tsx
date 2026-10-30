@@ -38,13 +38,13 @@ export function Topbar() {
           {activeOrg?.name?.[0]?.toUpperCase() ?? 'W'}
         </span>
         <span className="max-w-40 truncate">{activeOrg?.name ?? 'No organization'}</span>
-        <ChevronDown className="size-4 text-ink-400" />
+        <ChevronDown className="size-4 text-ink-500 dark:text-ink-400" />
       </button>
 
       {/* Command palette (⌘K): live search over the pages/settings/actions THIS account can reach. */}
       <button
         onClick={() => setPaletteOpen(true)}
-        className="flex h-9 flex-1 items-center gap-2 rounded-md border border-ink-200 px-3 text-sm text-ink-400 hover:bg-ink-50 dark:border-ink-700 dark:hover:bg-ink-800 md:max-w-md"
+        className="flex h-9 flex-1 items-center gap-2 rounded-md border border-ink-200 px-3 text-sm text-ink-500 dark:text-ink-400 hover:bg-ink-50 dark:border-ink-700 dark:hover:bg-ink-800 md:max-w-md"
         aria-label="Search (⌘K)"
       >
         <Search className="size-4" />
@@ -61,7 +61,7 @@ export function Topbar() {
         <div className="ml-1 flex items-center gap-2 pl-2">
           <div className="hidden text-right sm:block">
             <div className="text-sm font-medium leading-tight">{user?.name}</div>
-            <div className="text-xs text-ink-400">{user?.email}</div>
+            <div className="text-xs text-ink-500 dark:text-ink-400">{user?.email}</div>
           </div>
           <Avatar src={user?.avatarUrl} name={user?.name} className="size-8" />
           <Button

@@ -55,6 +55,13 @@ public sealed class OpenApiTests
         apiKey.GetProperty("name").GetString().Should().Be("X-Api-Key");
         apiKey.GetProperty("in").GetString().Should().Be("header");
 
+        // …and REQUIRED as alternatives: two separate top-level requirements (OR), each referencing a defined
+        // scheme. Under Microsoft.OpenApi v2 a requirement keys on a scheme *reference* resolved against the
+        // document — an unresolved one serialises as nothing, which would silently drop auth from the reference.
+        var requirements = root.GetProperty("security").EnumerateArray()
+            .Select(r => r.EnumerateObject().Select(p => p.Name).Single()).ToList();
+        requirements.Should().BeEquivalentTo(["Bearer", "ApiKey"]);
+
         var paths = root.GetProperty("paths");
 
         // Versioned controllers land via the API explorer; null-group module minimal-APIs land via their

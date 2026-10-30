@@ -178,7 +178,7 @@ function DetailsForm() {
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-ink-500">{label}</span>
+      <span className="text-ink-500 dark:text-ink-400">{label}</span>
       <span className={mono ? 'font-mono text-ink-800 dark:text-ink-200' : 'text-ink-800 dark:text-ink-200'}>{value}</span>
     </div>
   );

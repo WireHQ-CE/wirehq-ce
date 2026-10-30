@@ -56,8 +56,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 'pointer-events-auto flex items-start gap-2.5 rounded-lg border bg-ink-0 p-3 shadow-e2 dark:border-ink-800 dark:bg-ink-850',
               )}
             >
-              {t.tone === 'success' && <CheckCircle2 className="size-4 shrink-0 text-success-600" />}
-              {t.tone === 'error' && <AlertCircle className="size-4 shrink-0 text-danger-600" />}
+              {t.tone === 'success' && <CheckCircle2 className="size-4 shrink-0 text-success-700 dark:text-success-500" />}
+              {t.tone === 'error' && <AlertCircle className="size-4 shrink-0 text-danger-700 dark:text-danger-500" />}
               {t.tone === 'info' && <Info className="size-4 shrink-0 text-info-600" />}
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-ink-800 dark:text-ink-100">{t.message}</p>
@@ -67,7 +67,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 type="button"
                 onClick={() => remove(t.id)}
                 aria-label="Dismiss"
-                className="text-ink-400 transition-colors hover:text-ink-700 dark:hover:text-ink-200"
+                className="text-ink-500 dark:text-ink-400 transition-colors hover:text-ink-700 dark:hover:text-ink-200"
               >
                 <X className="size-3.5" />
               </button>
@@ -92,7 +92,7 @@ function CorrelationRef({ reference }: { reference: string }) {
         setTimeout(() => setCopied(false), 1500);
       }}
       title="Copy this reference for support"
-      className="mt-1 flex max-w-full items-center gap-1 font-mono text-[11px] text-ink-400 transition-colors hover:text-ink-600 dark:hover:text-ink-300"
+      className="mt-1 flex max-w-full items-center gap-1 font-mono text-[11px] text-ink-500 dark:text-ink-400 transition-colors hover:text-ink-600 dark:hover:text-ink-300"
     >
       <Copy className="size-3 shrink-0" />
       <span className="truncate">{copied ? 'Copied' : `Ref: ${reference}`}</span>

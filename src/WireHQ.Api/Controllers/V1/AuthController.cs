@@ -22,7 +22,9 @@ namespace WireHQ.Api.Controllers.V1;
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/auth")]
 [Authorize]
-[EnableRateLimiting(ApiServiceCollectionExtensions.AuthRateLimitPolicy)]
+// The strict brute-force limit sits on each action that takes a guessable credential or code, or sends email — NOT
+// on the controller: the SPA calls refresh/me/security-config on every page load, so a controller-wide limit locked
+// people out of signing in after ~10 page views. Those calls stay under the global per-client limit.
 public sealed class AuthController : ApiControllerBase
 {
     /// <summary>Public security config the auth pages read to decide whether to render the CAPTCHA. No secret.</summary>
@@ -34,6 +36,7 @@ public sealed class AuthController : ApiControllerBase
     /// <summary>Browser first-run setup: claims a fresh, ownerless self-hosted instance (docs/17). Only
     /// works while Setup:Enabled and no user exists — refused everywhere else, including all of SaaS.</summary>
     [HttpPost("setup")]
+    [EnableRateLimiting(ApiServiceCollectionExtensions.AuthRateLimitPolicy)]
     [AllowAnonymous]
     public async Task<IActionResult> Setup(SetupRequest request, CancellationToken cancellationToken)
     {
@@ -46,6 +49,7 @@ public sealed class AuthController : ApiControllerBase
     }
 
     [HttpPost("register")]
+    [EnableRateLimiting(ApiServiceCollectionExtensions.AuthRateLimitPolicy)]
     [AllowAnonymous]
     public async Task<IActionResult> Register(RegisterRequest request, CancellationToken cancellationToken)
     {
@@ -59,6 +63,7 @@ public sealed class AuthController : ApiControllerBase
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting(ApiServiceCollectionExtensions.AuthRateLimitPolicy)]
     [AllowAnonymous]
     public async Task<IActionResult> Login(LoginRequest request, CancellationToken cancellationToken)
     {
@@ -106,6 +111,7 @@ public sealed class AuthController : ApiControllerBase
 
     /// <summary>Completes an MFA-pending login with a TOTP or recovery code, returning a full access token.</summary>
     [HttpPost("mfa/verify")]
+    [EnableRateLimiting(ApiServiceCollectionExtensions.AuthRateLimitPolicy)]
     public async Task<IActionResult> VerifyMfa(VerifyMfaRequest request, CancellationToken cancellationToken)
     {
         var result = await Sender.Send(new VerifyMfaCommand(request.Code), cancellationToken);
@@ -115,6 +121,7 @@ public sealed class AuthController : ApiControllerBase
     }
 
     [HttpPost("forgot-password")]
+    [EnableRateLimiting(ApiServiceCollectionExtensions.AuthRateLimitPolicy)]
     [AllowAnonymous]
     public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request, CancellationToken cancellationToken)
     {
@@ -124,18 +131,21 @@ public sealed class AuthController : ApiControllerBase
     }
 
     [HttpPost("reset-password")]
+    [EnableRateLimiting(ApiServiceCollectionExtensions.AuthRateLimitPolicy)]
     [AllowAnonymous]
     public async Task<IActionResult> ResetPassword(ResetPasswordRequest request, CancellationToken cancellationToken) =>
         NoContent(await Sender.Send(new ResetPasswordCommand(request.Token, request.NewPassword, request.TurnstileToken), cancellationToken));
 
     /// <summary>Confirms a registration via the emailed link.</summary>
     [HttpPost("verify-email")]
+    [EnableRateLimiting(ApiServiceCollectionExtensions.AuthRateLimitPolicy)]
     [AllowAnonymous]
     public async Task<IActionResult> VerifyEmail(VerifyEmailRequest request, CancellationToken cancellationToken) =>
         NoContent(await Sender.Send(new VerifyEmailCommand(request.Token), cancellationToken));
 
     /// <summary>Re-sends the verification email for the signed-in user.</summary>
     [HttpPost("resend-verification")]
+    [EnableRateLimiting(ApiServiceCollectionExtensions.AuthRateLimitPolicy)]
     public async Task<IActionResult> ResendVerification(CancellationToken cancellationToken) =>
         NoContent(await Sender.Send(new ResendVerificationCommand(), cancellationToken));
 

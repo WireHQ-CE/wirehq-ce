@@ -81,7 +81,7 @@ function AvatarCard() {
             )}
           </div>
         </div>
-        <p className="mt-3 text-xs text-ink-400">PNG, JPEG or WebP. Resized to 256×256; max 512 KB after resize.</p>
+        <p className="mt-3 text-xs text-ink-500 dark:text-ink-400">PNG, JPEG or WebP. Resized to 256×256; max 512 KB after resize.</p>
       </CardContent>
     </Card>
   );

@@ -10,7 +10,7 @@ using WireHQ.Shared.Results;
 
 namespace WireHQ.Application.Features.Branding;
 
-// Brand image upload / removal / serve (docs/34 §4.3). Super-Admin write; anonymous, content-addressed read. Assets
+// Brand image upload / removal / serve (docs/34 §4.3). branding.manage write; anonymous, content-addressed read. Assets
 // are bounded PNG/ICO blobs validated in the domain (BrandAsset.Create). A replace mints a fresh id and garbage-
 // collects the old row, so the serve URL is immutable-cacheable. The hardened response headers
 // (Content-Disposition/CSP-sandbox/nosniff) are set by BrandingController, not here.
