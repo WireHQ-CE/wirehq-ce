@@ -13,8 +13,8 @@
 
   <ItemGroup Label="Application / CQRS">
     <PackageVersion Include="MediatR" Version="12.5.0" />
-    <PackageVersion Include="FluentValidation" Version="11.12.0" />
-    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="11.12.0" />
+    <PackageVersion Include="FluentValidation" Version="12.2.0" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.2.0" />
   </ItemGroup>
 
   <ItemGroup Label="Persistence / EF Core">
@@ -33,9 +33,17 @@
     <PackageVersion Include="QRCoder" Version="1.8.0" />
     <PackageVersion Include="NSec.Cryptography" Version="26.4.0" />
     <PackageVersion Include="DnsClient" Version="1.8.0" />
-    <PackageVersion Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.14.0" />
+    <PackageVersion Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.23.0" />
+    <!-- Transitive pins (CentralPackageTransitivePinningEnabled): ITfoxtec.Identity.Saml2 pulls these in. They must
+         match the rest of the Microsoft.IdentityModel family above — a mixed family builds fine and fails at runtime. -->
+    <PackageVersion Include="Microsoft.IdentityModel.Tokens.Saml" Version="8.23.0" />
+    <PackageVersion Include="Microsoft.IdentityModel.Xml" Version="8.23.0" />
+    <!-- Transitive security pins: the builds ITfoxtec SAML + IdentityModel resolve carry high-severity denial-of-service
+         advisories (CVE-2026-84008 / GHSA-846f-f764-76mx, CVE-2026-47302 / GHSA-cvvh-rhrc-wg4q). -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="9.0.22" />
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="9.0.22" />
     <PackageVersion Include="ITfoxtec.Identity.Saml2" Version="4.20.1" />
-    <PackageVersion Include="Novell.Directory.Ldap.NETStandard" Version="3.6.0" />
+    <PackageVersion Include="Novell.Directory.Ldap.NETStandard" Version="4.0.0" />
   </ItemGroup>
 
   <ItemGroup Label="WireGuard module">
@@ -43,7 +51,7 @@
   </ItemGroup>
 
   <ItemGroup Label="Orchestration module">
-    <PackageVersion Include="SSH.NET" Version="2025.1.0" />
+    <PackageVersion Include="SSH.NET" Version="2026.0.0" />
   </ItemGroup>
 
   <ItemGroup Label="API">
@@ -56,7 +64,7 @@
   <ItemGroup Label="Observability">
     <PackageVersion Include="Serilog.AspNetCore" Version="9.0.0" />
     <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
-    <PackageVersion Include="Serilog.Sinks.OpenTelemetry" Version="4.1.1" />
+    <PackageVersion Include="Serilog.Sinks.OpenTelemetry" Version="4.2.0" />
     <PackageVersion Include="Serilog.Enrichers.Environment" Version="3.0.1" />
     <PackageVersion Include="Serilog.Enrichers.Span" Version="3.1.0" />
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
@@ -89,11 +97,11 @@
   </ItemGroup>
 
   <ItemGroup Label="Testing">
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
     <PackageVersion Include="FluentAssertions" Version="6.12.2" />
-    <PackageVersion Include="NSubstitute" Version="5.3.0" />
+    <PackageVersion Include="NSubstitute" Version="6.2.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.1.0" />
   </ItemGroup>

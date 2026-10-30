@@ -7,12 +7,12 @@
 # The build context is assembled at test time: this Dockerfile + the `wg` shim (copied to the test output via
 # the csproj) plus a copy of the repo's `agent/` source — so `COPY agent/` below resolves. CGO is disabled so
 # the static binary built on golang:alpine runs as-is on the alpine runtime.
-FROM golang:1.23-alpine AS build
+FROM golang:1.27-alpine AS build
 WORKDIR /src
 COPY agent/ ./
 RUN CGO_ENABLED=0 go build -o /wirehq-agent .
 
-FROM alpine:3.20
+FROM alpine:3.23
 RUN mkdir -p /etc/wireguard \
     && printf '#!/bin/sh\nexit 0\n' > /usr/local/bin/wg-quick \
     && chmod 0755 /usr/local/bin/wg-quick
