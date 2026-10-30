@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '9.0.x'
 
@@ -52,7 +52,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -84,7 +84,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version: '1.23'
           cache: false # standard library only — no modules to cache
@@ -140,6 +140,26 @@ jobs:
     # SaaS code into the core, or adds a feature area nobody classified, fails HERE instead of at
     # the next manual generation. Docs-only PRs are skipped by the path gate; pushes to main always
     # verify (main is the CE's artifact source). Self-skips in the generated CE tree itself (no ce/).
+    #
+    # It also proves the CE MIGRATION CHAIN (docs/37 §7). generate-ce.sh itself stays database-free on
+    # purpose — the script that runs at tag time inside publish-ce.sh must be byte-identical to the one that
+    # runs on a PR — so the DB proofs live here as job steps instead.
+    services:
+      postgres:
+        # The Admin connection must be a SUPERUSER: rls.sql does CREATE ROLE wirehq_app.
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: ci-postgres
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      CE_OUT: ${{ github.workspace }}/../wirehq-ce-ci
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: ci-postgres
     steps:
       - uses: actions/checkout@v7
         with:
@@ -171,13 +191,13 @@ jobs:
 
       - name: Setup .NET
         if: steps.gate.outputs.run == 'true'
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '9.0.x'
 
       - name: Setup Node
         if: steps.gate.outputs.run == 'true'
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -185,7 +205,214 @@ jobs:
 
       - name: Generate + verify the Community Edition
         if: steps.gate.outputs.run == 'true'
-        run: ./scripts/generate-ce.sh "$RUNNER_TEMP/wirehq-ce"
+        run: ./scripts/generate-ce.sh "$CE_OUT"
+
+      # ─── CE migration-chain proofs (docs/37 §7) ───────────────────────────────────────────────────────
+      # Every step that boots the real --migrate path needs the FULL config set: Program.cs validates its
+      # configuration and exits 1 BEFORE the guard is reached, and a test that exits 1 for the wrong reason
+      # looks exactly like a passing refusal test. Seed__Owner* is deliberately absent so SelfHostOwnerSeeder
+      # no-ops.
+
+      - name: T1 — the CE chain applies to an empty database
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          set -euo pipefail
+          psql -c 'CREATE DATABASE t1;'
+          cd "$CE_OUT"
+          ConnectionStrings__Admin="Host=localhost;Database=t1;Username=postgres;Password=ci-postgres" \
+            dotnet ef database update --no-build -p src/WireHQ.Infrastructure -s src/WireHQ.Api
+          applied="$(psql -d t1 -tAc 'select count(*) from core.__ef_migrations_history;')"
+          [ "$applied" -ge 1 ] || { echo "::error::no migrations recorded"; exit 1; }
+          echo "✓ chain applied from empty ($applied migration(s))"
+
+      - name: T-EQ — the chain produces the model
+        if: steps.gate.outputs.run == 'true'
+        # T1 proves the chain APPLIES; the drift gate proves model ≡ snapshot. Neither proves snapshot ≡
+        # CHAIN — `migrations add` writes the migration and the snapshot as two independent files, and this
+        # design deliberately institutionalises hand-editing migrations. The dangerous resolution of a
+        # snapshot merge conflict (keep the snapshot, lose the migration body) reproduces the original defect
+        # with different plumbing: history says complete, tables are missing.
+        run: |
+          set -euo pipefail
+          psql -c 'CREATE DATABASE teq;'
+          rm -rf "$CE_OUT-eq" && cp -r "$CE_OUT" "$CE_OUT-eq"
+          # No chain ⇒ the initializer falls through to EnsureCreated, building the schema straight from the model.
+          rm -rf "$CE_OUT-eq/src/WireHQ.Infrastructure/Persistence/Migrations"
+          cd "$CE_OUT-eq"
+          dotnet build src/WireHQ.Api/WireHQ.Api.csproj -c Debug -v q -clp:ErrorsOnly
+          ConnectionStrings__Admin="Host=localhost;Database=teq;Username=postgres;Password=ci-postgres" \
+          ConnectionStrings__Default="Host=localhost;Database=teq;Username=wirehq_app;Password=ci-app-pw" \
+          Database__AppRolePassword=ci-app-pw \
+          Jwt__SigningKey=ci-signing-key-that-is-long-enough-for-hmac-sha256-validation \
+          SecretProtection__Key=$(head -c32 /dev/zero | base64) \
+          App__BaseUrl=http://localhost:28080 Setup__Enabled=true \
+            dotnet run --project src/WireHQ.Api --no-build -- --migrate
+          # Compare the CATALOG, not a pg_dump text diff. Physical column order legitimately differs — a
+          # delta's AddColumn appends, EnsureCreated writes model-declaration order — so a raw dump diff is
+          # permanently non-empty once any delta adds a column to an existing table, and pg_dump also emits a
+          # session-random \restrict token. Neither is a correctness property. Comparing columns + indexes +
+          # constraints as sorted sets is order-insensitive AND strictly stronger on the things that matter.
+          # (Measured on the v0.91.0 chain: 786 objects, identical both ways.)
+          psql -d t1 -c 'DROP TABLE IF EXISTS core.__ef_migrations_history;' >/dev/null
+          cat > /tmp/fingerprint.sql <<'SQL'
+          select 'col:'||table_schema||'.'||table_name||'.'||column_name||':'||data_type||':'||is_nullable||':'||coalesce(character_maximum_length::text,'-')
+          from information_schema.columns where table_schema in ('core','identity','audit','wg','orch','modules')
+          union all
+          select 'idx:'||schemaname||'.'||tablename||':'||indexdef
+          from pg_indexes where schemaname in ('core','identity','audit','wg','orch','modules')
+          union all
+          select 'con:'||n.nspname||'.'||rel.relname||':'||con.conname||':'||pg_get_constraintdef(con.oid)
+          from pg_constraint con join pg_class rel on rel.oid=con.conrelid join pg_namespace n on n.oid=rel.relnamespace
+          where n.nspname in ('core','identity','audit','wg','orch','modules')
+          order by 1;
+          SQL
+          for db in t1 teq; do psql -d "$db" -tAf /tmp/fingerprint.sql > "/tmp/$db.fp"; done
+          if ! diff -u /tmp/t1.fp /tmp/teq.fp; then
+            echo "::error::the CE chain and the CE model produce DIFFERENT schemas — a delta and the snapshot have diverged"
+            exit 1
+          fi
+          echo "✓ chain-built and model-built schemas are identical ($(wc -l < /tmp/t1.fp) objects)"
+
+      - name: T2/T3 — upgrade rehearsal, then the legacy refusal
+        if: steps.gate.outputs.run == 'true'
+        # The frozen baseline IS the published v0.90.1 bytes, so applying only the baseline reproduces a real
+        # v0.90.x install — no previous-tag generation and no committed fixture, correct at every release.
+        run: |
+          set -euo pipefail
+          psql -c 'CREATE DATABASE t2;'
+          cd "$CE_OUT"
+          ADMIN="Host=localhost;Database=t2;Username=postgres;Password=ci-postgres"
+          ConnectionStrings__Admin="$ADMIN" dotnet ef database update 00000000000000_InitialCreate \
+            --no-build -p src/WireHQ.Infrastructure -s src/WireHQ.Api
+          # Seed a row whose VALUE must survive: a rename scaffolded as Drop+Add keeps the row and loses the data.
+          psql -d t2 -c "INSERT INTO core.organizations
+                           (id, slug, name, status, edition, created_at_utc, is_deleted)
+                         VALUES ('11111111-1111-1111-1111-111111111111','ci-org','CI Org','Active',
+                                 'CommunityEdition', now(), false);" >/dev/null
+
+          run_migrate() {
+            ConnectionStrings__Admin="$ADMIN" \
+            ConnectionStrings__Default="Host=localhost;Database=t2;Username=wirehq_app;Password=ci-app-pw" \
+            Database__AppRolePassword=ci-app-pw \
+            Jwt__SigningKey=ci-signing-key-that-is-long-enough-for-hmac-sha256-validation \
+            SecretProtection__Key=$(head -c32 /dev/zero | base64) \
+            App__BaseUrl=http://localhost:28080 Setup__Enabled=true \
+              dotnet run --project src/WireHQ.Api --no-build -- --migrate
+          }
+
+          echo "── T2: a v0.90.x install upgrades"
+          run_migrate
+          name="$(psql -d t2 -tAc "select name from core.organizations where slug='ci-org';")"
+          [ "$name" = "CI Org" ] || { echo "::error::seeded value did not survive the upgrade (got '$name')"; exit 1; }
+          ConnectionStrings__Admin="$ADMIN" dotnet ef migrations has-pending-model-changes --no-build \
+            -p src/WireHQ.Infrastructure -s src/WireHQ.Api
+          # Every delta-created table carrying organization_id must have its RLS policy. Conditioned on the
+          # column: rls.sql applies tenant_isolation only to base tables that have one, and install-scoped
+          # tables (the modules schema is the precedent) are deliberately excluded.
+          missing="$(psql -d t2 -tAc "
+            select c.table_schema||'.'||c.table_name from information_schema.columns c
+            where c.column_name='organization_id'
+              and c.table_schema in ('core','identity','wg','orch')
+              and not exists (select 1 from pg_policies p
+                              where p.schemaname=c.table_schema and p.tablename=c.table_name
+                                and p.policyname='tenant_isolation');")"
+          [ -z "$missing" ] && echo "✓ upgrade preserved data; RLS covers every org-scoped table" || {
+            echo "::error::tables with organization_id but no tenant_isolation policy:"; echo "$missing"; exit 1; }
+
+          echo "── T3: the same database, but pre-v0.90.0 shaped, must be REFUSED"
+          psql -c 'CREATE DATABASE t3;'
+          ADMIN3="Host=localhost;Database=t3;Username=postgres;Password=ci-postgres"
+          ConnectionStrings__Admin="$ADMIN3" dotnet ef database update 00000000000000_InitialCreate \
+            --no-build -p src/WireHQ.Infrastructure -s src/WireHQ.Api
+          # DROP COLUMN, not DROP TABLE: dropping notification_rule_patterns needs CASCADE and would also
+          # remove the FK from the surviving table, producing something that is not a v0.89.0 shape.
+          psql -d t3 -c 'ALTER TABLE identity.notification_jobs DROP COLUMN escalation_level;' >/dev/null
+          set +e
+          out="$(ConnectionStrings__Admin="$ADMIN3" \
+            ConnectionStrings__Default="Host=localhost;Database=t3;Username=wirehq_app;Password=ci-app-pw" \
+            Database__AppRolePassword=ci-app-pw \
+            Jwt__SigningKey=ci-signing-key-that-is-long-enough-for-hmac-sha256-validation \
+            SecretProtection__Key=$(head -c32 /dev/zero | base64) \
+            App__BaseUrl=http://localhost:28080 Setup__Enabled=true \
+            dotnet run --project src/WireHQ.Api --no-build -- --migrate 2>&1)"
+          code=$?
+          set -e
+          echo "$out"
+          [ "$code" -ne 0 ] || { echo "::error::the guard did NOT refuse a pre-v0.90.0 database"; exit 1; }
+          grep -q 'escalation_level' <<< "$out" || { echo "::error::refusal does not name the missing object"; exit 1; }
+          grep -q 'NOTHING' <<< "$out"        || { echo "::error::refusal does not state that nothing was changed"; exit 1; }
+          # The message must be a MESSAGE. The generic handler's stack trace reads as broken software to a
+          # self-hoster, and the CE README's only "won't start" advice used to be `down -v`.
+          grep -q 'terminated unexpectedly' <<< "$out" && { echo "::error::refusal surfaced as a fatal crash"; exit 1; }
+          grep -qE '^\s+at ' <<< "$out" && { echo "::error::refusal leaked a stack trace"; exit 1; }
+          created="$(psql -d t3 -tAc "select count(*) from information_schema.tables where table_name='sms_opt_outs';")"
+          [ "$created" = "0" ] || { echo "::error::the guard refused but a delta table was still created"; exit 1; }
+          echo "✓ refused cleanly, named the cause, touched nothing"
+
+      - name: T4 — the drift gate itself still detects drift
+        if: steps.gate.outputs.run == 'true'
+        # The gate is the single point of enforcement for the whole design. If the verb's behaviour changes,
+        # or the tool floats to something that exits 0 unconditionally, the gate silently becomes a no-op and
+        # everything degrades to "remember to run the script".
+        run: |
+          set -euo pipefail
+          rm -rf "$CE_OUT-drift" && cp -r "$CE_OUT" "$CE_OUT-drift"
+          cd "$CE_OUT-drift"
+          snap=src/WireHQ.Infrastructure/Persistence/Migrations/ApplicationDbContextModelSnapshot.cs
+          # Perturb the SNAPSHOT rather than an entity: no C# to keep compiling, same comparison.
+          perl -0pi -e 's/(b\.ToTable\("organizations", "core"\);)/b.Property<string>("CiDriftProbe").HasColumnType("text");\n\n                    $1/' "$snap"
+          grep -q CiDriftProbe "$snap" || { echo "::error::T4 could not perturb the snapshot — anchor moved"; exit 1; }
+          dotnet build src/WireHQ.Api/WireHQ.Api.csproj -c Debug -v q -clp:ErrorsOnly
+          if dotnet ef migrations has-pending-model-changes --no-build \
+               -p src/WireHQ.Infrastructure -s src/WireHQ.Api >/dev/null 2>&1; then
+            echo "::error::the drift gate reported NO drift against a deliberately perturbed model — the gate is a no-op"
+            exit 1
+          fi
+          echo "✓ drift gate detects drift"
+
+      - name: T5 — ce-migration-add.sh still works (it is the only fix for a red gate)
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          set -euo pipefail
+          out="$(./scripts/ce-migration-add.sh CiSmokeProbe "$CE_OUT-smoke" 2>&1)"; echo "$out"
+          grep -q 'No CE counterpart needed' <<< "$out" \
+            || { echo "::error::expected the empty-delta short-circuit on an untouched tree"; exit 1; }
+          git diff --quiet -- ce/overlay/src/WireHQ.Infrastructure/Persistence/Migrations \
+            || { echo "::error::the smoke run modified the committed chain"; exit 1; }
+          echo "✓ delta generator healthy; committed chain untouched"
+
+      - name: T6/T7 — CE chain is append-only, and hand-written SQL is acknowledged
+        if: steps.gate.outputs.run == 'true' && github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          set -euo pipefail
+          CEM=ce/overlay/src/WireHQ.Infrastructure/Persistence/Migrations
+          # T7 — real immutability enforcement. git diff compares two TREES, so a delta created and then
+          # amended inside the branch is still 'A' — reviewer-requested changes to an unmerged delta pass.
+          # Mechanically enforces the backport rule when the base is a release branch.
+          bad="$(git diff --name-status "$BASE_SHA" "$HEAD_SHA" -- "$CEM" \
+                 | grep -vE '^A' | grep -v 'ApplicationDbContextModelSnapshot\.cs' || true)"
+          [ -z "$bad" ] || { echo "::error::the CE migration chain is append-only — modified/deleted:"; echo "$bad"; exit 1; }
+          # T6 — hand-written SQL is structurally invisible to the drift gate, to ce-migration-add.sh and to
+          # 5e-v: a model diff cannot see it. Narrowed to Sql( ONLY — renames/alters/drops are model-visible
+          # and already covered, and a wider gate would fire on most schema PRs, where the correct outcome is
+          # usually "acknowledge". Acknowledgement fatigue guarantees the one PR that mattered gets waved through.
+          for f in $(git diff --name-only --diff-filter=A "$BASE_SHA" "$HEAD_SHA" \
+                     -- 'src/WireHQ.Infrastructure/Persistence/Migrations/*.cs' | grep -v '\.Designer\.cs$' || true); do
+            awk '/void Up\(/{u=1} /void Down\(/{u=0} u' "$f" | grep -q 'migrationBuilder\.Sql(' || continue
+            grep -qE '//\s*ce:\s*(none|mirrored in |n/a)' "$f" && { echo "  ✓ $f acknowledged"; continue; }
+            grep -q 'skip-ce-catchup' <<< "$LABELS" && { echo "  ⚠ $f — bypassed by label"; continue; }
+            echo "::error::$f has hand-written Up() SQL that a model diff cannot mirror into the CE chain."
+            echo "  Add one of these next to it, then push:"
+            echo "    // ce: none                  — the CE has no counterpart to this data"
+            echo "    // ce: mirrored in <ce file> — mirrored by hand into the CE delta"
+            echo "    // ce: n/a (<stripped area>) — this area does not exist in the CE"
+            exit 1
+          done
+          echo "✓ chain append-only; hand-written SQL acknowledged"
 
   docs-sync:
     name: Docs sync
@@ -297,7 +524,7 @@ jobs:
 
       - name: Setup .NET
         if: matrix.language == 'csharp'
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '9.0.x'
 

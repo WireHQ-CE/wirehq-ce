@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -119,8 +121,13 @@ type diagnosticsRequest struct {
 
 // Client makes authenticated (mTLS) calls to the gateway once the agent is enrolled.
 type Client struct {
-	server string
-	http   *http.Client
+	server    string
+	http      *http.Client
+	transport *http.Transport
+
+	mu   sync.RWMutex
+	cert tls.Certificate
+	leaf *x509.Certificate
 }
 
 // NewClient builds an mTLS client that presents the enrolled client certificate.
@@ -129,18 +136,47 @@ func NewClient(cfg Config) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load client certificate (is the agent enrolled?): %w", err)
 	}
-	return &Client{
-		server: cfg.Server,
-		http: &http.Client{
-			Timeout: 90 * time.Second,
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					Certificates:       []tls.Certificate{cert},
-					InsecureSkipVerify: cfg.InsecureSkipVerify, //nolint:gosec // dev-only flag; trusts the self-signed dev gateway
-				},
+	leaf, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return nil, fmt.Errorf("parse client certificate: %w", err)
+	}
+
+	c := &Client{server: cfg.Server, cert: cert, leaf: leaf}
+	// The certificate is resolved per handshake (not fixed in Certificates) so a rotation takes effect without a
+	// restart — see useCertificate.
+	c.transport = &http.Transport{
+		TLSClientConfig: &tls.Config{
+			GetClientCertificate: func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
+				c.mu.RLock()
+				defer c.mu.RUnlock()
+				return &c.cert, nil
 			},
+			InsecureSkipVerify: cfg.InsecureSkipVerify, //nolint:gosec // dev-only flag; trusts the self-signed dev gateway
 		},
-	}, nil
+	}
+	c.http = &http.Client{Timeout: 90 * time.Second, Transport: c.transport}
+	return c, nil
+}
+
+// Leaf is the parsed client certificate currently presented.
+func (c *Client) Leaf() *x509.Certificate {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.leaf
+}
+
+// useCertificate switches to a rotated certificate. Idle keep-alive connections authenticated with the old cert
+// are closed, so the next request handshakes with the new one — which is what ends the gateway's grace for the
+// old cert (on the next heartbeat).
+func (c *Client) useCertificate(cert tls.Certificate) {
+	leaf, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return // unreachable: rotateCertificate parsed it already
+	}
+	c.mu.Lock()
+	c.cert, c.leaf = cert, leaf
+	c.mu.Unlock()
+	c.transport.CloseIdleConnections()
 }
 
 // Heartbeat reports liveness + the agent version.

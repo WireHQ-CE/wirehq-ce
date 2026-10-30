@@ -16,4 +16,8 @@ public sealed partial class ApplicationDbContext
     public DbSet<NotificationChannelConfig> NotificationChannelConfigs => Set<NotificationChannelConfig>();
 
     public DbSet<NotificationChannelUsage> NotificationChannelUsage => Set<NotificationChannelUsage>();
+
+    public DbSet<SmsOptOut> SmsOptOuts => Set<SmsOptOut>();
+
+    public DbSet<SmsConsent> SmsConsents => Set<SmsConsent>();
 }

@@ -40,6 +40,7 @@ public partial interface IApplicationDbContext
     DbSet<RecoveryCode> RecoveryCodes { get; }
     DbSet<PasswordResetToken> PasswordResetTokens { get; }
     DbSet<EmailVerificationToken> EmailVerificationTokens { get; }
+    DbSet<PhoneVerification> PhoneVerifications { get; }
     DbSet<AuditLog> AuditLogs { get; }
     DbSet<AuditChainAnchor> AuditChainAnchors { get; }
 

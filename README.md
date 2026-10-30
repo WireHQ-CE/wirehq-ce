@@ -88,24 +88,76 @@ trusted LAN, and set `WEB_BIND=127.0.0.1`. Back up your database any time with `
 
 ## 🔄 Updating
 
-Updates keep everything — your database, secrets, accounts, networks and peers are all preserved.
 From your clone:
 
 ```bash
-git pull                                                   # fetch the new release
-docker compose -f deploy/docker-compose.yml up -d --build  # rebuild + restart
+git pull              # fetch the new release
+./deploy/update.sh    # back up, rebuild, restart
 ```
 
-`--build` rebuilds the app from the new source, and a one-shot **migration job** applies any new
-database changes before the app starts. Nothing to re-enter, no wizard to repeat — your install picks
-up exactly where it left off. WireHQ tells you **in-app** whenever a newer version is available.
+`update.sh` takes a database backup **first** (into `./backups/`), then rebuilds from the new source and
+restarts. A one-shot **migration job** applies any new database changes before the app starts, and the app
+waits for it to finish. Nothing to re-enter, no wizard to repeat. WireHQ tells you **in-app** whenever a
+newer version is available.
 
-> 💡 **Back up first** — good practice before any update: `deploy/backup-db.sh`.
+Your database, secrets, accounts, networks and peers are preserved across updates — provided the update
+job completes successfully, and provided you are on **v0.90.0 or newer**. Releases before v0.90.0 could
+not deliver database changes to an existing install; if yours predates that, WireHQ will tell you plainly
+at update time rather than proceeding (see below).
 
-> ⚠️ **Never add `-v` to update.** `docker compose … down -v` **deletes your database volume** — every
-> account, network and peer with it. That flag is only for deliberately *resetting* an instance (for
-> example, clearing a leftover volume from an earlier install whose password no longer matches). A
-> routine update never removes volumes.
+<details>
+<summary>Prefer to run the steps yourself?</summary>
+
+```bash
+./deploy/backup-db.sh                                      # do not skip this
+docker compose -f deploy/docker-compose.yml up -d --build
+```
+
+`update.sh` exists because nothing else on a self-hosted install takes a backup for you, and an update can
+change existing data in place — not just add to it.
+</details>
+
+### If the update stops
+
+**Check what actually happened:**
+
+```bash
+docker compose -f deploy/docker-compose.yml logs migrate
+```
+
+**Your site appearing to work is not proof the update landed.** Compose starts in dependency order and stops
+before replacing the app when the database update fails — so your *previous* containers usually keep serving.
+The `git pull` succeeded and the site is up, which looks exactly like success. Confirm what you are really
+running:
+
+```bash
+docker compose -f deploy/docker-compose.yml ps
+```
+
+**Re-running is safe.** Database changes that already applied are skipped, so `./deploy/update.sh` picks up
+where it stopped rather than starting over.
+
+If WireHQ refused to update, it prints a message explaining what it found and what to do — and it changes
+**nothing** before refusing. Read that message; it is more specific than this page can be.
+
+> ⚠️ **Never add `-v`.** `docker compose … down -v` **deletes your database volume** — every account, network
+> and peer with it. A stopped update is never a volume problem and is never fixed by starting over. That flag
+> is only for deliberately *resetting* an instance (for example, clearing a leftover volume from an earlier
+> install whose password no longer matches). A routine update never removes volumes.
+
+### Going back to a previous version
+
+Check out the older tag and update as usual. WireHQ will **stop** the first time, because your database has
+already been updated by a newer version — that is deliberate, so a rollback is your decision rather than a
+surprise. To proceed, set this in `deploy/.env` and run `./deploy/update.sh` again:
+
+```bash
+MIGRATIONS_ACKNOWLEDGE_DOWNGRADE=true
+```
+
+The newer database schema is left exactly as it is; the older app runs against it. Set it back to `false`
+afterwards. If the older version misbehaves, the reliable recovery is restoring the backup `update.sh` took
+before you upgraded: `./deploy/restore-db.sh` (it restores to the version the backup came from).
 
 ## ✨ What's included — free forever
 

@@ -59,6 +59,7 @@ export function AgentsPanel({ canManage }: { canManage: boolean }) {
                 <th className="px-5 py-3 font-medium">Version</th>
                 <th className="px-5 py-3 font-medium">Instances</th>
                 <th className="px-5 py-3 font-medium">Last seen</th>
+                <th className="px-5 py-3 font-medium">Certificate</th>
                 <th className="px-5 py-3" />
               </tr>
             </thead>
@@ -83,6 +84,7 @@ function AgentRow({ agent, canManage }: { agent: Agent; canManage: boolean }) {
   const revoke = useRevokeAgent();
   const busy = disable.isPending || reactivate.isPending || revoke.isPending;
   const health = connectivity(agent);
+  const cert = certificateHealth(agent);
 
   function run(label: string, mutation: typeof disable, confirm?: string) {
     if (confirm && !window.confirm(confirm)) return;
@@ -118,6 +120,9 @@ function AgentRow({ agent, canManage }: { agent: Agent; canManage: boolean }) {
           <span className={`inline-block size-2 shrink-0 rounded-full ${health.dotClass}`} aria-hidden />
           {agent.lastSeenAtUtc ? formatRelative(agent.lastSeenAtUtc) : 'never'}
         </span>
+      </td>
+      <td className="px-5 py-3 text-ink-500" title={cert.title}>
+        {cert.tone ? <Badge tone={cert.tone} dot>{cert.label}</Badge> : cert.label}
       </td>
       <td className="px-5 py-3">
         {canManage && agent.status !== 'Revoked' && (
@@ -212,6 +217,35 @@ function connectivity(agent: Agent): { label: string; dotClass: string } {
   if (ageSeconds < 120) return { label: 'Online', dotClass: 'bg-success-500' };
   if (ageSeconds < 900) return { label: 'Idle', dotClass: 'bg-warning-500' };
   return { label: 'Offline', dotClass: 'bg-danger-500' };
+}
+
+/**
+ * Client-certificate health. The agent renews once two-thirds of its cert's lifetime has passed (~15 days before
+ * expiry on the 45-day leaf), so a cert inside 10 days means it has missed renewals for days — usually an agent
+ * binary too old to rotate, or a host that has been offline. An expired cert cannot renew: the agent must re-enrol.
+ */
+function certificateHealth(agent: Agent): { label: string; title: string; tone?: 'warning' | 'danger' } {
+  if (agent.status === 'Revoked' || !agent.certificateNotAfterUtc) {
+    return { label: '—', title: '' };
+  }
+  const expires = new Date(agent.certificateNotAfterUtc);
+  const days = (expires.getTime() - Date.now()) / 86_400_000;
+  const when = expires.toLocaleString();
+  if (days <= 0) {
+    return {
+      label: 'Expired',
+      tone: 'danger',
+      title: `Expired ${when}. The agent can no longer connect — re-enroll it with a new token.`,
+    };
+  }
+  if (days < 10) {
+    return {
+      label: `${Math.ceil(days)}d left`,
+      tone: 'warning',
+      title: `Expires ${when} and has not renewed. Upgrade the agent binary (renewal needs agent 0.2.0+) and check the host is online.`,
+    };
+  }
+  return { label: `${Math.floor(days)}d`, title: `Expires ${when}; the agent renews it automatically.` };
 }
 
 function lastSeenTitle(agent: Agent): string {

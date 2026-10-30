@@ -82,6 +82,9 @@ func Enroll(ctx context.Context, cfg Config, token, name string) (string, error)
 	if err := os.MkdirAll(cfg.StateDir, 0o700); err != nil {
 		return "", fmt.Errorf("create state dir: %w", err)
 	}
+	// A renewal staged by a previous identity must not be "recovered" over this one on the next start.
+	_ = os.Remove(nextPath(cfg.keyPath()))
+	_ = os.Remove(nextPath(cfg.certPath()))
 	if err := os.WriteFile(cfg.keyPath(), keyPEM, 0o600); err != nil {
 		return "", err
 	}

@@ -17,6 +17,7 @@ public sealed class PlanCatalogTests
 
         plan.Has(PlanFeatures.FleetDashboard).Should().BeFalse();
         plan.Has(PlanFeatures.Teams).Should().BeFalse();
+        plan.Has(PlanFeatures.NotificationsSms).Should().BeFalse("SMS Integration is a Pro+ feature, not free-core (docs/36 §9)");
         plan.Limit(PlanResource.Instances).Should().Be(3);
         plan.IsUnlimited(PlanResource.Instances).Should().BeFalse();
     }
@@ -31,6 +32,7 @@ public sealed class PlanCatalogTests
         plan.Has(PlanFeatures.Teams).Should().BeTrue();
         plan.Has(PlanFeatures.BulkEnrollment).Should().BeTrue();
         plan.Has(PlanFeatures.NotificationsRouting).Should().BeTrue("Advanced Notifications routing is a Pro+ feature (docs/35 Wave 3)");
+        plan.Has(PlanFeatures.NotificationsSms).Should().BeTrue("SMS Integration is a Pro+ feature (docs/36 §9)");
         plan.Has(PlanFeatures.NotificationsChat).Should().BeFalse("Chat Alerts is Enterprise-only, not in Pro");
         plan.Has(PlanFeatures.Sso).Should().BeFalse("SSO is a roadmap feature, not yet built");
         plan.Has(PlanFeatures.Ldap).Should().BeFalse("LDAP/AD directory sync is Enterprise-only, not in Pro");

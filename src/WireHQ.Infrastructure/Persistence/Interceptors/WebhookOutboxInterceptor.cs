@@ -49,6 +49,11 @@ public sealed class WebhookOutboxInterceptor(
         {
             await cache.EnsureLoadedAsync(cancellationToken);
         }
+        // NB the filter is correct here ONLY because the guarded call is DB-only: Npgsql maps command, pool and connect
+        // timeouts to NpgsqlException(inner TimeoutException), so the sole OperationCanceledException reachable is a
+        // genuine cancellation of our own token — which must propagate. If this cache ever gains an HTTP or Redis
+        // backing, or a linked timeout CTS, that stops being true and this becomes the worst place to get it wrong: an
+        // escaping timeout would abort the caller's unrelated business transaction. See ChatChannel for the fixed form.
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // The cache's first load opens a second connection; under a cold-start write storm that can contend for

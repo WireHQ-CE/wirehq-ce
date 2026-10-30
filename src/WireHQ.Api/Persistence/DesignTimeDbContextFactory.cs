@@ -13,9 +13,13 @@ namespace WireHQ.Api.Persistence;
 /// it can include the feature modules' model contributors — without them the generated migration
 /// would miss module schemas (e.g. <c>wg</c>). Add a module's contributor here when it ships.
 ///
-/// Generate the baseline (run from the repo root, with the .NET SDK available — e.g. in the
-/// sdk:9.0 container):
-///   dotnet ef migrations add InitialCreate -p src/WireHQ.Infrastructure -s src/WireHQ.Api -o Persistence/Migrations
+/// Add a migration (run from the repo root, with the .NET SDK available — e.g. in the sdk:9.0 container):
+///   dotnet ef migrations add &lt;Name&gt; -p src/WireHQ.Infrastructure -s src/WireHQ.Api -o Persistence/Migrations
+///
+/// This factory drives the SaaS chain. The Community Edition keeps its OWN chain and is NOT generated
+/// from here — use scripts/ce-migration-add.sh (docs/37, docs/17 §7.1). NB: a module whose contributor is
+/// missing from the list above is invisible to both `migrations add` and the CE drift gate, which compares
+/// an incomplete model against a snapshot of the same incomplete model and stays green.
 /// </summary>
 public sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<ApplicationDbContext>
 {

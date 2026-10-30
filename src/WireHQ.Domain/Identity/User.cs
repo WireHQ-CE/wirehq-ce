@@ -67,6 +67,17 @@ public sealed class User : AggregateRoot, IAuditable, ISoftDeletable
 
     public bool EmailVerified { get; private set; }
 
+    /// <summary>The user's verified <b>E.164</b> number for SMS alerts (docs/36-notifications.md §8, SMS Wave 4). Set
+    /// ONLY once ownership is proven via a <see cref="PhoneVerification"/> — distinct from the free-form profile
+    /// <see cref="Phone"/> string (which is unverified display data). Null until verified.</summary>
+    public PhoneNumber? PhoneE164 { get; private set; }
+
+    /// <summary>True once <see cref="PhoneE164"/> has been proven owned. Consent to receive is tracked separately in
+    /// <see cref="NotificationPreferences.SmsAlerts"/> (a verified number ≠ consent — docs/36 §4).</summary>
+    public bool PhoneVerified { get; private set; }
+
+    public DateTimeOffset? PhoneVerifiedAtUtc { get; private set; }
+
     public UserStatus Status { get; private set; }
 
     /// <summary>Platform-operator tier (above org roles). Defaults to <see cref="PlatformRole.None"/>.</summary>
@@ -163,6 +174,25 @@ public sealed class User : AggregateRoot, IAuditable, ISoftDeletable
 
         Raise(new UserEmailVerified(Id));
         return Result.Success();
+    }
+
+    /// <summary>Records a proven-owned phone number (docs/36 §8, SMS Wave 4). Called only after a
+    /// <see cref="PhoneVerification"/> confirms; the number must be unique across users (enforced by the caller +
+    /// the store). Does NOT grant consent to receive — that is the separate <see cref="NotificationPreferences.SmsAlerts"/>
+    /// opt-in with its own immutable audit event (docs/36 §4).</summary>
+    public void SetVerifiedPhone(PhoneNumber phone, DateTimeOffset nowUtc)
+    {
+        PhoneE164 = phone;
+        PhoneVerified = true;
+        PhoneVerifiedAtUtc = nowUtc;
+    }
+
+    /// <summary>Clears the verified phone (right-to-erasure / operator removal). Consent is cleared separately.</summary>
+    public void ClearVerifiedPhone()
+    {
+        PhoneE164 = null;
+        PhoneVerified = false;
+        PhoneVerifiedAtUtc = null;
     }
 
     public void ChangePassword(string newPasswordHash)

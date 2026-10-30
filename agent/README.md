@@ -36,6 +36,11 @@ sudo wirehq-agent run --server https://wirehq.example.com:28443
 The agent's identity (client key + cert, the org CA cert, the agent id) is stored under
 `--state` (default `/var/lib/wirehq-agent`). The private key never leaves the host.
 
+The client certificate lasts 45 days and the agent **renews it automatically** (with a fresh key) once
+two-thirds of that has passed — no restart, no operator action. An interrupted renewal is completed or discarded
+on the next start. If the certificate has already **expired** the gateway refuses it, and the agent logs how to
+re-enrol. Details: [`docs/13-agent.md`](../docs/13-agent.md) §6.1.
+
 Each poll the agent also reports its **observed status** (and, for `AgentManaged` interfaces, the
 locally-held interface public key). It records the hash of the config it applied per interface, and if the
 on-disk config later changes out from under it (host-side tampering) it reports **config drift** to WireHQ —
@@ -73,5 +78,6 @@ agent/
     bundle.go                   verify the CA signature BEFORE applying (ECDSA-P384/SHA-384, P1363)
     applier.go                  write config → wg-quick up, snapshot+rollback; wg show dump → telemetry
     run.go                      the poll loop
+    rotate.go                   certificate renewal (cert/rotate) + crash-safe identity persistence
   deploy/wirehq-agent.service   hardened systemd unit
 ```

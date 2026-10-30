@@ -137,7 +137,7 @@ public sealed class NotificationRule : AggregateRoot, ITenantOwned, IAuditable
         TimeOnly? quietHoursStart = null, TimeOnly? quietHoursEnd = null, string? quietHoursTimeZone = null,
         IReadOnlyCollection<EscalationStepSpec>? escalationSteps = null)
     {
-        if (Validate(name, eventPattern, audience, audienceRef, additionalPatterns,
+        if (Validate(name, eventPattern, channel, audience, audienceRef, additionalPatterns,
                 quietHoursStart, quietHoursEnd, quietHoursTimeZone, digestCadence, escalationSteps) is { } error)
         {
             return error;
@@ -159,7 +159,7 @@ public sealed class NotificationRule : AggregateRoot, ITenantOwned, IAuditable
         TimeOnly? quietHoursStart = null, TimeOnly? quietHoursEnd = null, string? quietHoursTimeZone = null,
         IReadOnlyCollection<EscalationStepSpec>? escalationSteps = null)
     {
-        if (Validate(name, eventPattern, audience, audienceRef, additionalPatterns,
+        if (Validate(name, eventPattern, channel, audience, audienceRef, additionalPatterns,
                 quietHoursStart, quietHoursEnd, quietHoursTimeZone, digestCadence, escalationSteps) is { } error)
         {
             return error;
@@ -231,7 +231,7 @@ public sealed class NotificationRule : AggregateRoot, ITenantOwned, IAuditable
             .ToArray();
 
     private static Error? Validate(
-        string name, string eventPattern, NotificationAudience audience, Guid? audienceRef,
+        string name, string eventPattern, ChannelKind channel, NotificationAudience audience, Guid? audienceRef,
         IReadOnlyCollection<string>? additionalPatterns,
         TimeOnly? quietHoursStart, TimeOnly? quietHoursEnd, string? quietHoursTimeZone,
         DigestCadence digestCadence, IReadOnlyCollection<EscalationStepSpec>? escalationSteps)
@@ -298,6 +298,40 @@ public sealed class NotificationRule : AggregateRoot, ITenantOwned, IAuditable
                 {
                     return NotificationErrors.InvalidEscalationStep;
                 }
+            }
+        }
+
+        // SMS critical-only gating (docs/36 §6, Wave 4 Slice C). SMS is restricted to a small curated set of critical
+        // events. The check applies whether the PRIMARY channel OR any escalation step is Sms — an Email-primary rule
+        // with an SMS escalation step would otherwise slip past — and lives here so it covers Create AND Update
+        // identically (the same reason escalation-requires-immediate does). Escalation SMS steps are additionally
+        // hard-rejected at the command layer until Slice F, so the step branch is belt-and-suspenders until then.
+        var usesSms = channel == ChannelKind.Sms
+            || (escalationSteps?.Any(s => s.ChannelKind == ChannelKind.Sms) ?? false);
+        if (usesSms)
+        {
+            // Every pattern must be a LITERAL critical action — reject `*`/`prefix.*` globs (a broad glob matches a
+            // critical action at author time yet fires SMS on everything at runtime) AND any non-curated literal. A
+            // curated action is literal by construction, so a set-membership check subsumes both.
+            var smsPatterns = (additionalPatterns ?? Array.Empty<string>())
+                .Select(p => p?.Trim() ?? string.Empty)
+                .Where(p => p.Length > 0)
+                .Prepend(pattern);
+            if (smsPatterns.Any(p => !NotificationCriticalEvents.IsCritical(p)))
+            {
+                return NotificationErrors.SmsCriticalOnly;
+            }
+
+            // A critical alert must be immediate and must never be held: digests coalesce (delay + multi-segment
+            // spend) and quiet hours defer — both incompatible with a break-glass SMS (the time-critical precedent).
+            if (digestCadence != DigestCadence.Immediate)
+            {
+                return NotificationErrors.SmsImmediateOnly;
+            }
+
+            if (QuietHours.IsConfigured(quietHoursStart, quietHoursEnd, quietHoursTimeZone))
+            {
+                return NotificationErrors.SmsNoQuietHours;
             }
         }
 
@@ -436,4 +470,13 @@ public static class NotificationErrors
 
     public static readonly Error AlertNotFound =
         Error.NotFound("notification.alert_not_found", "Alert was not found.");
+
+    public static readonly Error SmsCriticalOnly =
+        Error.Validation("notification.sms_critical_only", "SMS rules can only target a specific critical event by name — wildcards aren't allowed. Choose one from the critical list.");
+
+    public static readonly Error SmsImmediateOnly =
+        Error.Validation("notification.sms_immediate_only", "SMS alerts are sent immediately and can't be batched into a daily/weekly digest.");
+
+    public static readonly Error SmsNoQuietHours =
+        Error.Validation("notification.sms_no_quiet_hours", "SMS is for critical alerts and can't be held during quiet hours.");
 }

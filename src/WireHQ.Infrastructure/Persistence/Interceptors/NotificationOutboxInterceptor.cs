@@ -48,6 +48,9 @@ public sealed class NotificationOutboxInterceptor(
         {
             await cache.EnsureLoadedAsync(cancellationToken);
         }
+        // As in WebhookOutboxInterceptor: this filter is correct ONLY while the guarded call stays DB-only. Npgsql maps
+        // its timeouts to NpgsqlException, so the only reachable OperationCanceledException is a real cancellation of
+        // our own token, which must propagate. Give this cache an HTTP/Redis backing and the analysis flips.
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // Never fail the unrelated business save for a notification — skip capture this once (the cache warms on

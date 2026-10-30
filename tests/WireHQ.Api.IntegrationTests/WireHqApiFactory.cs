@@ -22,6 +22,10 @@ namespace WireHQ.Api.IntegrationTests;
 /// </summary>
 public sealed partial class WireHqApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    /// <summary>The pinned public base URL wired for the SMS-inbound webhook tests (docs/36 §5, Slice D). Tests sign the
+    /// canonical URL = this base + the request path.</summary>
+    public const string SmsInboundTestBaseUrl = "https://sms.wirehq.test";
+
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
         .WithDatabase("wirehq")
@@ -118,6 +122,9 @@ public sealed partial class WireHqApiFactory : WebApplicationFactory<Program>, I
         Environment.SetEnvironmentVariable("Jwt__SigningKey", "integration-test-signing-key-at-least-32-bytes-long!!");
         Environment.SetEnvironmentVariable("SecretProtection__Key", "ZGV2LW9ubHktMzItYnl0ZS1hZXMta2V5LWNoYW5nZSE=");
         Environment.SetEnvironmentVariable("Seed__DemoData", "false");
+        // The pinned public base URL the inbound SMS STOP/HELP webhook signature is verified against (docs/36 §5, Slice
+        // D). Set here so the SMS-inbound integration tests can sign a request; harmless to other tests (SMS stays dark).
+        Environment.SetEnvironmentVariable("Notifications__Sms__InboundWebhookBaseUrl", SmsInboundTestBaseUrl);
         // New orgs default to Enterprise in the suite so the functional tests run unconstrained by plan
         // caps/feature gates; the entitlement tests downgrade their org to Community via SetEditionAsync to
         // exercise gating. Production defaults to Community. (docs/commercial.md)

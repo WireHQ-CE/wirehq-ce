@@ -25,6 +25,10 @@ public sealed class AgentConfiguration : IEntityTypeConfiguration<Agent>
         // cert — the hot lookup. Globally unique: each issued cert carries a random serial (distinct hash).
         builder.HasIndex(a => a.CertificateFingerprint).IsUnique();
         builder.HasIndex(a => new { a.OrganizationId, a.Id });
+
+        // Accepted alongside the current fingerprint during a rotation's grace (the same auth lookup), so indexed.
+        builder.Property(a => a.PreviousCertificateFingerprint).HasMaxLength(95);
+        builder.HasIndex(a => a.PreviousCertificateFingerprint);
     }
 }
 

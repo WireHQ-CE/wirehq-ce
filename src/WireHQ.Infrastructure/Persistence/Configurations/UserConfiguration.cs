@@ -21,6 +21,17 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         });
         builder.Navigation(u => u.Email).IsRequired();
 
+        // Verified E.164 phone for SMS alerts (docs/36 §8, Wave 4). Optional owned value object → a nullable phone_e164
+        // column. The filtered unique index enforces "a verified number is unique across users" (docs/36 §2) while
+        // leaving unverified/absent numbers unconstrained (Postgres treats NULLs as distinct anyway).
+        builder.OwnsOne(u => u.PhoneE164, phone =>
+        {
+            phone.Property(p => p.Value).HasColumnName("phone_e164").HasMaxLength(PhoneNumber.MaxLength);
+            phone.HasIndex(p => p.Value).IsUnique().HasFilter("phone_verified = true");
+        });
+        builder.Property(u => u.PhoneVerified).IsRequired();
+        builder.Property(u => u.PhoneVerifiedAtUtc);
+
         builder.Property(u => u.Name).HasMaxLength(User.MaxNameLength).IsRequired();
         builder.Property(u => u.FirstName).HasMaxLength(User.MaxNamePartLength);
         builder.Property(u => u.LastName).HasMaxLength(User.MaxNamePartLength);

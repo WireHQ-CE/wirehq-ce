@@ -20,4 +20,14 @@ public partial interface IApplicationDbContext
     DbSet<NotificationChannelConfig> NotificationChannelConfigs { get; }
 
     DbSet<NotificationChannelUsage> NotificationChannelUsage { get; }
+
+    /// <summary>The append-only SMS suppression ledger (docs/36 §4.3, Wave 4 Slice D). STOP appends; START clears (never
+    /// deletes). Read as a hard precondition of every SMS send + the OTP send; written by the inbound STOP webhook under
+    /// a tenant bypass with an explicit org, and by the carrier-21610 self-heal.</summary>
+    DbSet<SmsOptOut> SmsOptOuts { get; }
+
+    /// <summary>Per-(org, user) SMS consent (docs/36 §4.1, Wave 4 Slice D precondition D-3) — the queryable consent state
+    /// (sender-specific: consent in org A never authorises org B). Replaces the old global
+    /// <c>NotificationPreferences.SmsAlerts</c> flag; the immutable consent audit event remains the legal proof.</summary>
+    DbSet<SmsConsent> SmsConsents { get; }
 }

@@ -38,6 +38,29 @@ public static class DependencyInjection
         var setupEnabled = bool.TryParse(configuration["Setup:Enabled"], out var setupOn) && setupOn;
         services.AddSingleton(new WireHQ.Application.Features.Authentication.SetupOptions { Enabled = setupEnabled });
 
+        // Operator-configured daily per-org SMS cap (docs/36 §7). Absent/0/negative ⇒ the default; the scheduler clamps
+        // it to a finite floor + hard max (NEVER uncapped) via NotificationSendPolicy. Read here so the Application layer
+        // never touches IConfiguration (same pattern as EntitlementOptions / RegistrationOptions).
+        var smsDailyCap = int.TryParse(configuration["Notifications:Sms:DailyCapPerOrg"], out var cap) ? cap : 0;
+        // Dark-boundary master switch (docs/36 §2/§10): real SMS sends stay OFF until Slice D flips it. Default FALSE —
+        // any value other than an explicit "true" leaves the channel provably dark in code.
+        var smsSendEnabled = bool.TryParse(configuration["Notifications:Sms:Enabled"], out var enabled) && enabled;
+        // The pinned public base URL the inbound STOP/HELP webhook signature is verified against (docs/36 §5, Slice D) —
+        // never Request.Host. Empty ⇒ inbound verification can never succeed (fail-closed), correct until the operator
+        // stands the endpoint up.
+        // Normalised, and deliberately with NO fallback to App:BaseUrl. The blank default is a documented fail-closed
+        // kill switch on an anonymous endpoint; falling back would arm that endpoint on every install at upgrade time
+        // with no operator action. A present-but-invalid value resolves to null for the same reason — silently using a
+        // different origin would produce a signature that never matches, which looks identical to "no STOPs arriving".
+        var smsInboundBaseUrl = WireHQ.Application.Features.Notifications.SmsInboundEndpoint.Normalize(
+            configuration["Notifications:Sms:InboundWebhookBaseUrl"]);
+        services.AddSingleton(new WireHQ.Application.Features.Notifications.SmsNotificationOptions
+        {
+            DailyCapPerOrg = smsDailyCap,
+            Enabled = smsSendEnabled,
+            InboundWebhookBaseUrl = smsInboundBaseUrl,
+        });
+
         services.AddScoped<AuditableEntityInterceptor>();
         services.AddScoped<AuditChainInterceptor>();
         services.AddScoped<PublishDomainEventsInterceptor>();
@@ -84,6 +107,10 @@ public static class DependencyInjection
         services.AddSingleton<WireHQ.Application.Features.Notifications.NotificationDispatchScheduler>();
         services.AddScoped<WireHQ.Application.Abstractions.Notifications.INotificationChannel, Messaging.Notifications.EmailChannel>();
         services.AddScoped<WireHQ.Application.Abstractions.Notifications.INotificationChannel, Messaging.Notifications.ChatChannel>();
+        // SMS channel (docs/36 Wave 4, kept-core) + its Twilio provider adapter behind the ISmsProvider seam. Ships in
+        // every edition; a licence lights up the notifications.sms gate. Dark in Slice A (the phone resolver is empty).
+        services.AddScoped<WireHQ.Application.Abstractions.Notifications.INotificationChannel, Messaging.Notifications.Sms.SmsChannel>();
+        services.AddScoped<WireHQ.Application.Abstractions.Notifications.ISmsProvider, Messaging.Notifications.Sms.TwilioSmsProvider>();
         // No-billing-plane fallback: only takes effect when the SaaS reader registration above is
         // stripped (the Community Edition) — TryAdd is a no-op while it is present (docs/17 §5).
         services.TryAddScoped<IBillingSummaryReader, NullBillingSummaryReader>();

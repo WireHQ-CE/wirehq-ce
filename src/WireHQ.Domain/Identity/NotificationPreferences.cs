@@ -24,6 +24,7 @@ public sealed class NotificationPreferences : Entity
         BillingNotifications = true;
         MarketingEmails = false;
         ServiceStatusAlerts = false;
+        SmsAlerts = false; // SMS consent is OPT-IN — default OFF (docs/36-notifications.md §4/§8, TCPA)
     }
 
     public Guid UserId { get; private set; }
@@ -46,7 +47,26 @@ public sealed class NotificationPreferences : Entity
     /// <summary>Service status: incident and scheduled-maintenance emails (opt-in — default off).</summary>
     public bool ServiceStatusAlerts { get; private set; }
 
+    /// <summary><b>DEPRECATED (D-3):</b> SMS consent moved to the per-(org, user) <c>SmsConsent</c> record (docs/36 §4.1)
+    /// — this GLOBAL per-user flag can't express sender-specific consent, so it is no longer read or written. The column
+    /// is retained inert (dropped in a later cleanup); <c>CreateDefault</c> still leaves it false. Was: SMS-alerts consent
+    /// (opt-in, default OFF), the CONSENT-to-receive fact separate from phone ownership.</summary>
+    public bool SmsAlerts { get; private set; }
+
     public static NotificationPreferences CreateDefault(Guid userId) => new(Guid.CreateVersion7(), userId);
+
+    /// <summary><b>DEPRECATED (D-3):</b> SMS consent is now per-(org, user) via <c>SmsConsent</c> — no caller remains.
+    /// Retained only so the inert column round-trips.</summary>
+    public bool SetSmsAlerts(bool enabled)
+    {
+        if (SmsAlerts == enabled)
+        {
+            return false;
+        }
+
+        SmsAlerts = enabled;
+        return true;
+    }
 
     public void Update(bool securityAlerts, bool vpnStatusAlerts, bool productAnnouncements, bool billingNotifications, bool marketingEmails, bool serviceStatusAlerts)
     {

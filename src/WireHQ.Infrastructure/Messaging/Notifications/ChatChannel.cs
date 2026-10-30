@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using Microsoft.Extensions.Logging;
 using WireHQ.Application.Abstractions.Notifications;
 using WireHQ.Application.Abstractions.Security;
 using WireHQ.Domain.Notifications;
@@ -14,7 +15,10 @@ namespace WireHQ.Infrastructure.Messaging.Notifications;
 /// hosts (blocker B-7). Gated: only reached for a delivery whose rule required <c>notifications.chat</c>, which the
 /// scheduler re-checks against the live entitlement union before dispatch (MM-14).
 /// </summary>
-public sealed class ChatChannel(IHttpClientFactory httpClientFactory, ISecretProtector secretProtector) : INotificationChannel
+public sealed class ChatChannel(
+    IHttpClientFactory httpClientFactory,
+    ISecretProtector secretProtector,
+    ILogger<ChatChannel> logger) : INotificationChannel
 {
     public const string HttpClientName = "notifications-outbound";
 
@@ -48,11 +52,18 @@ public sealed class ChatChannel(IHttpClientFactory httpClientFactory, ISecretPro
                 ? ChannelSendResult.Ok((int)response.StatusCode)
                 : ChannelSendResult.Failed($"Chat endpoint returned HTTP {(int)response.StatusCode}.", (int)response.StatusCode);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             // The SSRF guard throws for a disallowed destination; transport errors also land here — both are retryable
             // delivery failures (backoff). Return a GENERIC message so the delivery history never carries the
             // destination host / URL detail (review nit).
+            //
+            // The second clause is load-bearing: this client has Timeout = 10s (Program.cs), and an HttpClient timeout
+            // throws TaskCanceledException — which IS an OperationCanceledException — even though OUR token was never
+            // cancelled. Without it, a hung operator webhook escapes all the way past the scheduler's per-delivery
+            // catch and skips its batch SaveChanges, losing the outcome of every delivery in the batch. Only a
+            // cancellation of our own token means "the host is stopping"; everything else is a delivery failure.
+            logger.LogWarning(ex, "Chat notification send failed for organization {OrganizationId}.", request.OrganizationId);
             return ChannelSendResult.Failed("Chat endpoint unreachable.");
         }
     }

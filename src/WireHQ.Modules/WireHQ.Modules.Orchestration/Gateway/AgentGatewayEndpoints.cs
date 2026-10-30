@@ -27,7 +27,8 @@ public static class AgentGatewayEndpoints
                 (await gateway.EnrollAsync(request, ct)).ToHttpResult())
             .AllowAnonymous();
 
-        // Cert-authenticated: re-key before expiry, and report liveness.
+        // Cert-authenticated: re-key before expiry, and report liveness. Both take the presented fingerprint: a
+        // rotation keeps the old cert in grace, and the first heartbeat on the new cert ends it.
         group.MapPost("/cert/rotate", async (RotateCertRequest request, HttpContext context, AgentGatewayService gateway, CancellationToken ct) =>
             {
                 if (AgentIdentity(context) is not { } identity)
@@ -35,7 +36,7 @@ public static class AgentGatewayEndpoints
                     return Results.Unauthorized();
                 }
 
-                return (await gateway.RotateAsync(identity.AgentId, identity.OrganizationId, request, ct)).ToHttpResult();
+                return (await gateway.RotateAsync(identity.AgentId, identity.OrganizationId, identity.CertificateFingerprint, request, ct)).ToHttpResult();
             })
             .RequireAuthorization(RequireAgentCertificate);
 
@@ -46,7 +47,7 @@ public static class AgentGatewayEndpoints
                     return Results.Unauthorized();
                 }
 
-                return (await gateway.HeartbeatAsync(identity.AgentId, request, ct)).ToHttpResult();
+                return (await gateway.HeartbeatAsync(identity.AgentId, identity.CertificateFingerprint, request, ct)).ToHttpResult();
             })
             .RequireAuthorization(RequireAgentCertificate);
 
@@ -151,12 +152,14 @@ public static class AgentGatewayEndpoints
         return await next(context);
     }
 
-    private static (Guid AgentId, Guid OrganizationId)? AgentIdentity(HttpContext context)
+    private static (Guid AgentId, Guid OrganizationId, string CertificateFingerprint)? AgentIdentity(HttpContext context)
     {
         var agentClaim = context.User.FindFirst(AgentGatewayClaims.AgentId)?.Value;
         var orgClaim = context.User.FindFirst(AgentGatewayClaims.OrganizationId)?.Value;
+        var fingerprint = context.User.FindFirst(AgentGatewayClaims.CertificateFingerprint)?.Value;
         return Guid.TryParse(agentClaim, out var agentId) && Guid.TryParse(orgClaim, out var organizationId)
-            ? (agentId, organizationId)
+            && !string.IsNullOrEmpty(fingerprint)
+            ? (agentId, organizationId, fingerprint)
             : null;
     }
 }

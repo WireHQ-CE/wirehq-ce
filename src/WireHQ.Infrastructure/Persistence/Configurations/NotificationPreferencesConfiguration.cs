@@ -19,5 +19,7 @@ public sealed class NotificationPreferencesConfiguration : IEntityTypeConfigurat
         builder.Property(p => p.ProductAnnouncements).IsRequired();
         builder.Property(p => p.BillingNotifications).IsRequired();
         builder.Property(p => p.MarketingEmails).IsRequired();
+        // SMS consent (docs/36 §8, Wave 4): opt-in, default OFF. The migration backfills any pre-existing row with false.
+        builder.Property(p => p.SmsAlerts).IsRequired().HasDefaultValue(false);
     }
 }

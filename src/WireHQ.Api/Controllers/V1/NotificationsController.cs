@@ -41,6 +41,61 @@ public sealed class NotificationsController : ApiControllerBase
     public async Task<IActionResult> SetChatDestination(SetChatDestinationRequest request, CancellationToken cancellationToken) =>
         NoContent(await Sender.Send(new SetChatDestinationCommand(request.Provider, request.DestinationUrl), cancellationToken));
 
+    /// <summary>The org's SMS provider status (provider + configured + masked From; NEVER the credential — docs/36 §5).</summary>
+    [HttpGet("channel-configs/sms")]
+    public async Task<IActionResult> SmsProviderStatus(CancellationToken cancellationToken) =>
+        Ok(await Sender.Send(new GetSmsProviderStatusQuery(), cancellationToken));
+
+    /// <summary>Set the org's own SMS provider credential + sender (write-only credential; docs/36 §5). Gated on notifications.sms.</summary>
+    [HttpPut("channel-configs/sms")]
+    public async Task<IActionResult> SetSmsProvider(SetSmsProviderRequest request, CancellationToken cancellationToken) =>
+        NoContent(await Sender.Send(
+            new SetSmsProviderCommand(request.Provider, request.AccountSid, request.AuthToken, request.FromValue), cancellationToken));
+
+    /// <summary>Record/revoke the org's A2P/10DLC campaign attestation (docs/36 §4.6) — the pre-send gate that unlocks
+    /// SMS sending. Gated on notifications.sms.</summary>
+    [HttpPut("channel-configs/sms/a2p")]
+    public async Task<IActionResult> SetSmsA2pAttestation(SetSmsA2pAttestationRequest request, CancellationToken cancellationToken) =>
+        NoContent(await Sender.Send(new SetSmsA2pAttestationCommand(request.Attested, request.Reference), cancellationToken));
+
+    /// <summary>Mint (or rotate) the org's inbound STOP/HELP webhook token. The response carries the plaintext token
+    /// and the paste-ready URL <b>once</b> — neither is recoverable afterwards. Gated on notifications.sms.</summary>
+    [HttpPost("channel-configs/sms/inbound-token")]
+    public async Task<IActionResult> MintSmsInboundWebhookToken(
+        MintSmsInboundWebhookTokenRequest request, CancellationToken cancellationToken) =>
+        Ok(await Sender.Send(new MintSmsInboundWebhookTokenCommand(request.Rotate), cancellationToken));
+
+    /// <summary>End a token rotation early, once the provider is confirmed on the new URL. Deliberately NOT
+    /// entitlement-gated — closing the old URL must not depend on a live subscription.</summary>
+    [HttpPost("channel-configs/sms/inbound-token/complete-rotation")]
+    public async Task<IActionResult> CompleteSmsInboundWebhookTokenRotation(CancellationToken cancellationToken) =>
+        NoContent(await Sender.Send(new CompleteSmsInboundWebhookTokenRotationCommand(), cancellationToken));
+
+    /// <summary>Revoke every inbound webhook token — the leak response. Deliberately NOT entitlement-gated: an operator
+    /// must always be able to close an anonymous internet-facing endpoint. Sending holds until a new token is minted
+    /// and demonstrated.</summary>
+    [HttpDelete("channel-configs/sms/inbound-token")]
+    public async Task<IActionResult> ClearSmsInboundWebhookToken(CancellationToken cancellationToken) =>
+        NoContent(await Sender.Send(new ClearSmsInboundWebhookTokenCommand(), cancellationToken));
+
+    /// <summary>The org's SMS suppression ledger — numbers masked, newest first, active suppressions first.
+    /// <c>phone</c> is an EXACT lookup, never a partial match (docs/36 §4.3).
+    /// <para>⚠ This route is load-bearing: <c>ServerSpanScrubber</c> drops <c>url.query</c> for
+    /// <c>/api/v1/notifications/sms/opt-outs</c> by literal prefix, because <c>?phone=</c> is not on any OTel redaction
+    /// allow-list. Move or rename it and searched numbers export verbatim to the collector, with nothing failing.</para></summary>
+    [HttpGet("sms/opt-outs")]
+    public async Task<IActionResult> SmsOptOuts(
+        [FromQuery] string? phone = null, [FromQuery] int pageSize = 50, CancellationToken cancellationToken = default) =>
+        Ok(await Sender.Send(new ListSmsOptOutsQuery(phone, pageSize), cancellationToken));
+
+    /// <summary>Record an opt-out that reached the operator off-channel — by phone, email or ticket (FCC 47 CFR
+    /// 64.1200(a)(10): revocation by any reasonable means is valid). The number travels in the BODY, not the query, so it
+    /// never reaches a span or an access log. There is deliberately no inverse: a suppression is lifted only by the
+    /// subscriber's own START through the signed inbound webhook.</summary>
+    [HttpPost("sms/opt-outs")]
+    public async Task<IActionResult> RecordSmsOptOut(RecordSmsOptOutRequest request, CancellationToken cancellationToken) =>
+        Ok(await Sender.Send(new RecordSmsOptOutCommand(request.Phone, request.Reason), cancellationToken));
+
     [HttpPost("rules")]
     public async Task<IActionResult> Create(CreateNotificationRuleRequest request, CancellationToken cancellationToken) =>
         Created(await Sender.Send(
@@ -98,3 +153,13 @@ public sealed record UpdateNotificationRuleRequest(
 public sealed record SetNotificationRuleStatusRequest(bool Enabled);
 
 public sealed record SetChatDestinationRequest(NotificationProviderKind Provider, string DestinationUrl);
+
+public sealed record SetSmsProviderRequest(NotificationProviderKind Provider, string AccountSid, string AuthToken, string FromValue);
+
+public sealed record SetSmsA2pAttestationRequest(bool Attested, string? Reference);
+
+/// <summary><c>Rotate</c> keeps the existing token working through a grace window so repointing the provider cannot
+/// drop a STOP; false replaces it immediately, which is the right behaviour for a suspected leak.</summary>
+public sealed record MintSmsInboundWebhookTokenRequest(bool Rotate = false);
+
+public sealed record RecordSmsOptOutRequest(string Phone, string? Reason);

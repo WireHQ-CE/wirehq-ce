@@ -47,8 +47,14 @@ public static class PlanFeatures
     // curated event stays free-core (N-4). This is NOT a prerequisite for Chat/SMS (N-5 — routing is advanced-only).
     // Granted to Pro AND Enterprise (Pro+; editions do not inherit, so both list it); sold à-la-carte as the
     // `advanced-notifications` CE Marketplace module (GateOnly — kept-core, activation lights it up).
-    // notifications.sms stays reserved for Wave 4.
     public const string NotificationsRouting = "notifications.routing";
+
+    // Notifications — SMS Integration (docs/36 Wave 4). A rule that targets an SMS channel requires this key
+    // (channel-includes-its-rules, N-5). Bring-your-own-provider (the operator's own Twilio/Vonage account), so it is
+    // NOT a prerequisite for anything else. Granted to Pro AND Enterprise (Pro+; editions do not inherit, so both list
+    // it); sold à-la-carte as the `sms-integration` CE Marketplace module (GateOnly — kept-core, activation lights it
+    // up). Slice A ships the engine DARK (no live recipients); the module card stays "coming soon" until Slice D.
+    public const string NotificationsSms = "notifications.sms";
 }
 
 /// <summary>A countable resource a plan caps. <see cref="PlanDefinition.Unlimited"/> means no cap.</summary>
@@ -126,7 +132,7 @@ public sealed class PlanCatalog : IPlanCatalog
         Features: new HashSet<string>
         {
             PlanFeatures.FleetDashboard, PlanFeatures.DriftAutoReconverge, PlanFeatures.Teams, PlanFeatures.BulkEnrollment,
-            PlanFeatures.NotificationsRouting,
+            PlanFeatures.NotificationsRouting, PlanFeatures.NotificationsSms,
         },
         Limits: new Dictionary<PlanResource, int>
         {
@@ -153,6 +159,7 @@ public sealed class PlanCatalog : IPlanCatalog
             PlanFeatures.FleetDashboard, PlanFeatures.DriftAutoReconverge, PlanFeatures.Teams, PlanFeatures.BulkEnrollment,
             PlanFeatures.AuditExport, PlanFeatures.Sso, PlanFeatures.Scim, PlanFeatures.AccessPolicies, PlanFeatures.Ldap,
             PlanFeatures.CustomRoles, PlanFeatures.ApiKeys, PlanFeatures.NotificationsChat, PlanFeatures.NotificationsRouting,
+            PlanFeatures.NotificationsSms,
         },
         Limits: new Dictionary<PlanResource, int>());
 

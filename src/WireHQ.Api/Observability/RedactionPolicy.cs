@@ -28,6 +28,8 @@ public sealed partial class RedactionPolicy : IRedactionPolicy
         text = BearerPattern().Replace(text, $"Bearer {Mask}");
         text = WireGuardKeyPattern().Replace(text, Mask);
         text = ConnectionPasswordPattern().Replace(text, $"$1={Mask}");
+        // Shared with the OTel span plane — see SmsWebhookPathScrub for why it must not be duplicated here.
+        text = SmsWebhookPathScrub.Apply(text);
         return text;
     }
 
@@ -50,4 +52,7 @@ public sealed partial class RedactionPolicy : IRedactionPolicy
     // A connection-string password (keep the key, mask the value up to the next ';').
     [GeneratedRegex(@"(?i)\b(password|pwd)=[^;]+")]
     private static partial Regex ConnectionPasswordPattern();
+
+    // (The SMS inbound-webhook token pattern moved to SmsWebhookPathScrub — it is needed by the OTel span plane too,
+    // and two copies would drift the moment the route changes.)
 }

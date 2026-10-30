@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using WireHQ.Domain.Common;
 
 namespace WireHQ.Domain.Notifications;
@@ -23,6 +24,9 @@ public sealed class NotificationDelivery : Entity, ITenantOwned
     public const int MaxErrorLength = 512;
     public const int MaxRecipientLength = 320;
     public const int MaxSubjectLength = 256;
+
+    /// <summary>Twilio SIDs are 34 characters; the extra room is for other providers' ids (Vonage, Slice E).</summary>
+    public const int MaxProviderMessageIdLength = 64;
 
     /// <summary>Backoff before the 2nd..6th attempt (after the 1st..5th failure): 30s, 2m, 10m, 1h, 6h.</summary>
     private static readonly TimeSpan[] Backoff =
@@ -114,6 +118,13 @@ public sealed class NotificationDelivery : Entity, ITenantOwned
 
     public DateTimeOffset? DeliveredAtUtc { get; private set; }
 
+    /// <summary>The provider's own message id (a Twilio <c>SM…</c> SID), recorded once the provider names one — on the
+    /// send response, or later on its status callback (docs/36 §7, Wave 4 W4). It is the operator's reference when
+    /// reconciling a delivery against their own carrier bill, which matters most for an
+    /// <see cref="NotificationDeliveryStatus.Unresolved"/> row: it is the only handle they have on a message we could
+    /// not confirm. Null until the provider tells us one.</summary>
+    public string? ProviderMessageId { get; private set; }
+
     public static NotificationDelivery Create(
         Guid organizationId, Guid ruleId, Guid jobId, ChannelKind channel, IReadOnlyCollection<string> requiredFeatures,
         string recipient, string subject, string body, string? dedupValue, DateTimeOffset nowUtc,
@@ -123,8 +134,9 @@ public sealed class NotificationDelivery : Entity, ITenantOwned
             recipient, Truncate(subject, MaxSubjectLength)!, body, dedupValue, nowUtc,
             quietHoursStart, quietHoursEnd, quietHoursTimeZone, escalationLevel);
 
-    /// <summary>A successful send — done.</summary>
-    public void MarkSucceeded(int? responseCode, DateTimeOffset nowUtc)
+    /// <summary>A successful send — done. <paramref name="providerMessageId"/> is recorded when the channel got one
+    /// back (SMS); other channels pass null and the column stays empty.</summary>
+    public void MarkSucceeded(int? responseCode, DateTimeOffset nowUtc, string? providerMessageId = null)
     {
         Attempts++;
         Status = NotificationDeliveryStatus.Delivered;
@@ -132,6 +144,51 @@ public sealed class NotificationDelivery : Entity, ITenantOwned
         LastError = null;
         DeliveredAtUtc = nowUtc;
         NextAttemptAtUtc = null;
+        ProviderMessageId ??= Truncate(providerMessageId, MaxProviderMessageIdLength);
+    }
+
+    /// <summary>
+    /// The send reached the provider but its outcome was never learned — a timeout, a dropped connection, a 5xx after
+    /// the request was accepted. <b>Terminal, and deliberately never retried</b> (docs/36 §7/§12, the settled operator
+    /// decision): a blind resend would charge the operator twice and text a person twice, most likely while something is
+    /// already going wrong. It is safe to stop here <i>because escalation is acknowledgement-driven and
+    /// outcome-independent</i> — an unacknowledged critical alert still escalates whether or not this particular message
+    /// landed. The risk being managed is the silence, not the missed send.
+    /// <para>This is a distinct status rather than a <see cref="Cancel"/> with a note, because "Cancelled" states the
+    /// opposite of what happened: it reads as "we did not send it", when we may well have. A ledger that misstates its
+    /// own facts is the defect, not the wording.</para>
+    /// </summary>
+    public void MarkUnresolved(string reason, string? providerMessageId = null)
+    {
+        Attempts++;
+        Status = NotificationDeliveryStatus.Unresolved;
+        LastError = Truncate(reason, MaxErrorLength);
+        NextAttemptAtUtc = null;
+        ProviderMessageId ??= Truncate(providerMessageId, MaxProviderMessageIdLength);
+    }
+
+    /// <summary>
+    /// The provider's status callback told us what actually happened to a message we had already handed over (Wave 4 W4).
+    /// Only resolves a row we are genuinely unsure about — an <see cref="NotificationDeliveryStatus.Unresolved"/> one —
+    /// so a late or replayed callback can never rewrite a delivery whose outcome we observed ourselves, and applying the
+    /// same callback twice is a no-op. Returns true when it changed something.
+    /// <para>A callback reporting failure resolves to <see cref="NotificationDeliveryStatus.Failed"/> and does
+    /// <b>not</b> re-enter the retry ladder: the operator decision is that an unresolved send is terminal, and the
+    /// escalation that covers it does not depend on this row's outcome.</para>
+    /// </summary>
+    public bool ResolveFromProvider(bool delivered, string? providerMessageId, string? reason, DateTimeOffset nowUtc)
+    {
+        if (Status != NotificationDeliveryStatus.Unresolved)
+        {
+            return false;
+        }
+
+        Status = delivered ? NotificationDeliveryStatus.Delivered : NotificationDeliveryStatus.Failed;
+        LastError = delivered ? null : Truncate(reason, MaxErrorLength);
+        DeliveredAtUtc = delivered ? nowUtc : null;
+        NextAttemptAtUtc = null;
+        ProviderMessageId ??= Truncate(providerMessageId, MaxProviderMessageIdLength);
+        return true;
     }
 
     /// <summary>A send failure — retry with backoff, or give up after <see cref="MaxAttempts"/>.</summary>
@@ -183,16 +240,24 @@ public sealed class NotificationDelivery : Entity, ITenantOwned
         QuietHours.DeferUntil(QuietHoursStart, QuietHoursEnd, QuietHoursTimeZone, nowUtc);
 
     public bool IsTerminal =>
-        Status is NotificationDeliveryStatus.Delivered or NotificationDeliveryStatus.Failed or NotificationDeliveryStatus.Cancelled;
+        Status is NotificationDeliveryStatus.Delivered or NotificationDeliveryStatus.Failed
+            or NotificationDeliveryStatus.Cancelled or NotificationDeliveryStatus.Unresolved;
 
     private static string? Truncate(string? value, int max) =>
         value is null ? null : value.Length <= max ? value : value[..max];
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum NotificationDeliveryStatus
 {
     Pending = 0,
     Delivered = 1,
     Failed = 2,
     Cancelled = 3,
+
+    /// <summary>Handed to the provider, outcome never learned, deliberately not resent (docs/36 §7/§12, Wave 4 W4).
+    /// Terminal — but a provider status callback may later resolve it to Delivered or Failed. Distinct from
+    /// <see cref="Cancelled"/> on purpose: "cancelled" would claim we did not send, which is exactly what we do not
+    /// know. Stored as a string in a varchar(16) column; "Unresolved" is 10 characters, so no widening.</summary>
+    Unresolved = 4,
 }

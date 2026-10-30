@@ -49,6 +49,27 @@ x-app-env: &app-env
   # notes. Set REEDITION_EXISTING_ORGS=true in deploy/.env once, redeploy (the migrate job applies it), then you
   # may unset it. A fresh install needs nothing here (new orgs are already CommunityEdition).
   Entitlements__ReeditionExistingOrgs: "${REEDITION_EXISTING_ORGS:-false}"
+  # Going BACK to an older version. The update job refuses to start when the database has already been updated
+  # by a newer WireHQ than the one you are running, so a rollback stops loudly instead of silently running the
+  # old app against a newer schema. Rolling back is supported — set MIGRATIONS_ACKNOWLEDGE_DOWNGRADE=true in
+  # deploy/.env to confirm it is deliberate. The newer schema is left exactly as it is (docs/37 §3.4).
+  Migrations__AcknowledgeDowngrade: "${MIGRATIONS_ACKNOWLEDGE_DOWNGRADE:-false}"
+  # ── SMS notifications (the `sms-integration` Marketplace module) ─────────────────────────────────────
+  # DARK BY DEFAULT. Enabled=false is a code-level send gate: every provider send is skipped in code, so no
+  # SMS can reach a real number whatever else is configured. Listed here because this file enumerates every
+  # setting the app reads — there is no env_file passthrough, so a key absent from this block cannot be set
+  # by an operator at all. Bring your own Twilio account; the number, the 10DLC/A2P registration and the
+  # carrier bill are yours. InboundWebhookBaseUrl must be the PUBLIC https origin of this install — the
+  # STOP/HELP webhook signature is verified against it, so it cannot be derived from the request.
+  Notifications__Sms__Enabled: "${SMS_ENABLED:-false}"
+  Notifications__Sms__DailyCapPerOrg: "${SMS_DAILY_CAP_PER_ORG:-100}"
+  Notifications__Sms__InboundWebhookBaseUrl: "${SMS_INBOUND_WEBHOOK_BASE_URL:-}"
+  # Reverse-proxy trust (finding #1). The real client IP — used by the rate limiter, audit and session records —
+  # is read from X-Forwarded-For, trusting only these hops. Default: loopback + private ranges (the container
+  # network and a host proxy). Add a proxy on a PUBLIC address (e.g. a separate HAProxy) to the PROXIES list;
+  # override NETWORKS (replaces the default) if your end users themselves sit on private addresses.
+  ForwardedHeaders__KnownNetworks: "${FORWARDED_TRUSTED_NETWORKS:-}"
+  ForwardedHeaders__KnownProxies: "${FORWARDED_TRUSTED_PROXIES:-}"
   # Community Edition branding: transactional email carries the edition tagline under the wordmark
   # (the web UI's tagline is baked in at build time via web/.env — docs/17 §6).
   Branding__EditionTagline: "Community Edition"

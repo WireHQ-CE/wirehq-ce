@@ -36,7 +36,8 @@ internal static class NotificationShapeGating
         {
             ChannelKind.Email => null, // free-core
             ChannelKind.Chat => PlanFeatures.NotificationsChat,
-            _ => "unsupported", // SMS — not built yet (Wave 4)
+            ChannelKind.Sms => PlanFeatures.NotificationsSms, // Wave 4 — a primary-SMS rule requires notifications.sms
+            _ => "unsupported", // any future channel not yet built
         };
         if (channelFeature == "unsupported")
         {
@@ -86,9 +87,11 @@ internal static class NotificationShapeGating
     }
 
     /// <summary>Each escalation step's channel must be one the org can actually use at author time (docs/35 §5, M19): a
-    /// Chat step needs <c>notifications.chat</c>; SMS is not built (Wave 4). Routing itself is required by the
-    /// advanced-shape gate (an escalation chain makes the rule advanced). Rejected here so an unusable step can't be
-    /// authored and then silently no-op at fire time.</summary>
+    /// Chat step needs <c>notifications.chat</c>. An <b>SMS escalation step is hard-rejected</b> even though the SMS
+    /// channel itself now exists — SMS escalation carries idempotency + multi-segment-spend risk and is deferred to
+    /// Slice F (docs/36 §2/§10); the reject stays until then. Routing itself is required by the advanced-shape gate
+    /// (an escalation chain makes the rule advanced). Rejected here so an unusable step can't be authored and then
+    /// silently no-op at fire time.</summary>
     public static async Task<Error?> ValidateEscalationChannelsAsync(
         IReadOnlyCollection<EscalationStepSpec>? escalationSteps, IEntitlementService entitlements, CancellationToken cancellationToken)
     {

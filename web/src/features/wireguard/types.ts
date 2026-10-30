@@ -169,6 +169,8 @@ export interface Agent {
   certificateFingerprint: string;
   enrolledAtUtc: string;
   lastSeenAtUtc: string | null;
+  /** When the agent's current client cert expires. A running agent rotates ~15 days before; null if unparseable. */
+  certificateNotAfterUtc: string | null;
   managedInstances: number;
   instancesWithDrift: number;
 }

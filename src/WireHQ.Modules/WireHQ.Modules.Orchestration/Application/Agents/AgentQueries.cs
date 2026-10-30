@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using Microsoft.EntityFrameworkCore;
 using WireHQ.Application.Abstractions.Persistence;
 using WireHQ.Application.Common.Messaging;
@@ -7,7 +9,11 @@ using WireHQ.Shared.Results;
 
 namespace WireHQ.Modules.Orchestration.Application.Agents;
 
-/// <summary>An enrolled agent's operator-facing details. The certificate is public; no secret is projected.</summary>
+/// <summary>
+/// An enrolled agent's operator-facing details. The certificate is public; no secret is projected.
+/// <see cref="CertificateNotAfterUtc"/> is when the agent's current client cert expires — a running agent rotates
+/// well before it, so an approaching or past date means the agent is not rotating and needs attention.
+/// </summary>
 public sealed record AgentItem(
     Guid Id,
     string Name,
@@ -17,8 +23,26 @@ public sealed record AgentItem(
     string CertificateFingerprint,
     DateTimeOffset EnrolledAtUtc,
     DateTimeOffset? LastSeenAtUtc,
+    DateTimeOffset? CertificateNotAfterUtc,
     int ManagedInstances,
     int InstancesWithDrift);
+
+internal static class AgentCertificateExpiry
+{
+    /// <summary>The stored PEM's expiry, or null if it cannot be parsed (never fails the listing).</summary>
+    public static DateTimeOffset? NotAfter(string certificatePem)
+    {
+        try
+        {
+            using var certificate = X509Certificate2.CreateFromPem(certificatePem);
+            return new DateTimeOffset(certificate.NotAfter.ToUniversalTime(), TimeSpan.Zero);
+        }
+        catch (CryptographicException)
+        {
+            return null;
+        }
+    }
+}
 
 public sealed record ListAgentsQuery : IQuery<IReadOnlyList<AgentItem>>, IAuthorizedRequest
 {
@@ -35,6 +59,7 @@ public sealed class ListAgentsQueryHandler(IApplicationDbContext dbContext)
             .Select(a => new
             {
                 a.Id, a.Name, a.Status, a.Platform, a.Version, a.CertificateFingerprint, a.EnrolledAtUtc, a.LastSeenAtUtc,
+                a.CertificatePem,
             })
             .ToListAsync(cancellationToken);
 
@@ -53,7 +78,7 @@ public sealed class ListAgentsQueryHandler(IApplicationDbContext dbContext)
         {
             var managed = bindings.Where(b => b.AgentId == a.Id).ToList();
             return new AgentItem(a.Id, a.Name, a.Status.ToString(), a.Platform, a.Version,
-                a.CertificateFingerprint, a.EnrolledAtUtc, a.LastSeenAtUtc,
+                a.CertificateFingerprint, a.EnrolledAtUtc, a.LastSeenAtUtc, AgentCertificateExpiry.NotAfter(a.CertificatePem),
                 managed.Count, managed.Count(b => driftedInstances.Contains(b.InstanceId)));
         }).ToList();
 
@@ -87,6 +112,7 @@ public sealed class GetAgentQueryHandler(IApplicationDbContext dbContext)
                 .CountAsync(r => managedInstanceIds.Contains(r.InstanceId) && r.HasDrift, cancellationToken);
 
         return new AgentItem(a.Id, a.Name, a.Status.ToString(), a.Platform, a.Version,
-            a.CertificateFingerprint, a.EnrolledAtUtc, a.LastSeenAtUtc, managedInstanceIds.Count, withDrift);
+            a.CertificateFingerprint, a.EnrolledAtUtc, a.LastSeenAtUtc, AgentCertificateExpiry.NotAfter(a.CertificatePem),
+            managedInstanceIds.Count, withDrift);
     }
 }

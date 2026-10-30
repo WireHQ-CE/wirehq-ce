@@ -5,6 +5,7 @@ using WireHQ.Api.Controllers;
 using WireHQ.Application.Features.Account.Avatar;
 using WireHQ.Application.Features.Account.ChangePassword;
 using WireHQ.Application.Features.Account.Notifications;
+using WireHQ.Application.Features.Account.PhoneVerification;
 using WireHQ.Application.Features.Account.UpdateProfile;
 using WireHQ.Application.Features.Mfa.ConfirmTotp;
 using WireHQ.Application.Features.Mfa.DisableMfa;
@@ -76,7 +77,33 @@ public sealed class AccountController : ApiControllerBase
                 request.SecurityAlerts, request.VpnStatusAlerts, request.ProductAnnouncements,
                 request.BillingNotifications, request.MarketingEmails, request.ServiceStatusAlerts),
             cancellationToken));
+
+    /// <summary>Toggle SMS-alerts consent for the signed-in user (docs/36 §4). A dedicated, immutably-audited action.</summary>
+    [HttpPut("notifications/sms-consent")]
+    public async Task<IActionResult> SetSmsConsent(SetSmsConsentRequest request, CancellationToken cancellationToken) =>
+        NoContent(await Sender.Send(new SetSmsAlertsConsentCommand(request.Enabled), cancellationToken));
+
+    /// <summary>The signed-in user's verified-phone + SMS-provider status (never a code or credential).</summary>
+    [HttpGet("phone")]
+    public async Task<IActionResult> GetPhoneStatus(CancellationToken cancellationToken) =>
+        Ok(await Sender.Send(new GetPhoneVerificationStatusQuery(), cancellationToken));
+
+    /// <summary>Begin phone verification — sends a one-time code via the org's SMS provider (docs/36 §5). Non-oracular.</summary>
+    [HttpPost("phone/verify/start")]
+    public async Task<IActionResult> StartPhoneVerification(StartPhoneVerificationRequest request, CancellationToken cancellationToken) =>
+        NoContent(await Sender.Send(new StartPhoneVerificationCommand(request.PhoneNumber), cancellationToken));
+
+    /// <summary>Confirm phone verification with the code. Constant-time, attempt-capped, single generic error on failure.</summary>
+    [HttpPost("phone/verify/confirm")]
+    public async Task<IActionResult> ConfirmPhoneVerification(ConfirmPhoneVerificationRequest request, CancellationToken cancellationToken) =>
+        NoContent(await Sender.Send(new ConfirmPhoneVerificationCommand(request.Code), cancellationToken));
 }
+
+public sealed record SetSmsConsentRequest(bool Enabled);
+
+public sealed record StartPhoneVerificationRequest(string PhoneNumber);
+
+public sealed record ConfirmPhoneVerificationRequest(string Code);
 
 public sealed record NotificationPreferencesRequest(
     bool SecurityAlerts,

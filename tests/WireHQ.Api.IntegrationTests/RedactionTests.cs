@@ -55,6 +55,32 @@ public sealed class RedactionTests
             .And.NotContain("gI6EdUSYvn8ugXOt8QQD6Yc+JyiZxIhp3GInSWRfWGE=");
     }
 
+    [Theory]
+    // The SMS inbound-webhook token (a show-once secret) reaches the request-summary log via {RequestPath} — the
+    // trailing path segment is masked while the route stays visible (docs/36 §5).
+    [InlineData("HTTP POST /api/v1/sms/inbound/tok_SECRETvalue123 responded 204", "/api/v1/sms/inbound/", "tok_SECRETvalue123")]
+    [InlineData("url /api/v2/sms/inbound/AbC-dEf_123 next", "/api/v2/sms/inbound/", "AbC-dEf_123")]
+    // The delivery-status callback carries the SAME token, so it must be masked identically — a leak there is
+    // indistinguishable in consequence from a leak on the inbound route.
+    [InlineData("HTTP POST /api/v1/sms/status/tok_SECRETvalue123 responded 204", "/api/v1/sms/status/", "tok_SECRETvalue123")]
+    public void Sms_inbound_token_in_a_path_is_masked(string text, string keptPrefix, string secret)
+    {
+        var redacted = _policy.Redact(text);
+        redacted.Should().Contain(keptPrefix + RedactionPolicy.Mask).And.NotContain(secret);
+    }
+
+    [Fact]
+    public void The_log_and_span_planes_mask_the_token_identically()
+    {
+        // These are two entirely separate code paths — Serilog never sees a span attribute, and the span plane never
+        // sees a log message. They shared no code until the token started reaching both, and the failure mode of them
+        // drifting is silent: a route rename fixes one and leaves the other exporting the secret verbatim.
+        const string path = "/api/v1/sms/inbound/tok_SECRETvalue123";
+
+        _policy.Redact(path).Should().Be(SmsWebhookPathScrub.Apply(path))
+            .And.NotContain("tok_SECRETvalue123");
+    }
+
     [Fact]
     public void Connection_string_password_is_masked_keeping_the_key()
     {
@@ -69,6 +95,21 @@ public sealed class RedactionTests
     {
         const string clean = "Handled CreateNetworkCommand in 16.4ms";
         _policy.Redact(clean).Should().Be(clean);
+    }
+
+    [Fact]
+    public void Twilio_account_sid_is_scrubbed_from_a_span_url()
+    {
+        // The SID is a URL PATH segment (docs/36 §5, D-2) — the span-tag scrub masks it while keeping the endpoint shape.
+        var scrubbed = HttpSpanScrubber.ScrubTwilioSid("https://api.twilio.com/2010-04-01/Accounts/ACdeadbeef1234/Messages.json");
+        scrubbed.Should().Be("https://api.twilio.com/2010-04-01/Accounts/***/Messages.json").And.NotContain("ACdeadbeef1234");
+    }
+
+    [Fact]
+    public void A_non_twilio_url_is_left_untouched_by_the_sid_scrub()
+    {
+        const string url = "https://hooks.slack.com/services/T0/B0/xxx";
+        HttpSpanScrubber.ScrubTwilioSid(url).Should().Be(url);
     }
 
     [Fact]

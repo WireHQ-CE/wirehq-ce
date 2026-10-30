@@ -45,3 +45,8 @@ Thumbs.db
 # ---- Logs ----
 logs/
 *.log
+
+# ---- Database backups ----
+# deploy/backup-db.sh writes here, and deploy/update.sh calls it before every self-hosted update — so on a
+# Community Edition clone these accumulate inside the very tree the update ritual `git pull`s.
+backups/

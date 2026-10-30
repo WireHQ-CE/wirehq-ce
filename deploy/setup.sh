@@ -93,6 +93,22 @@ SMTP_USERNAME='${SMTP_USERNAME:-}'
 SMTP_PASSWORD='${SMTP_PASSWORD:-}'
 SMTP_FROM_EMAIL='${SMTP_FROM_EMAIL:-no-reply@wirehq.local}'
 SMTP_FROM_NAME='${SMTP_FROM_NAME:-WireHQ}'
+
+# ── SMS notifications (optional; the sms-integration Marketplace module) ────────────────────
+# Off by default, and off is enforced in code — not just here. Bring your own Twilio account:
+# the number, the 10DLC/A2P registration and the carrier bill are yours. SMS_INBOUND_WEBHOOK_BASE_URL
+# must be this install's PUBLIC https origin (e.g. https://wirehq.example.com) — the STOP/HELP
+# webhook signature is checked against it, so it cannot be worked out from the request itself.
+SMS_ENABLED=false
+SMS_DAILY_CAP_PER_ORG=100
+SMS_INBOUND_WEBHOOK_BASE_URL=''
+
+# ── Going back to a previous version ────────────────────────────────────────────────────────
+# WireHQ refuses to start if your database has already been updated by a NEWER version than the
+# one you are running, so a rollback stops loudly instead of silently running an old app against
+# a new schema. Rolling back IS supported — set this to true to confirm it is deliberate. The
+# newer database schema is left exactly as it is. Set it back to false afterwards.
+MIGRATIONS_ACKNOWLEDGE_DOWNGRADE=false
 EOF
 
 chmod 600 "$env_file"

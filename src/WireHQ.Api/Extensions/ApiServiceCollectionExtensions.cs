@@ -98,16 +98,16 @@ public static class ApiServiceCollectionExtensions
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-            // Per-IP global limit.
+            // Per-client global limit, keyed on the address resolved from the proxy chain (ClientAddress).
             options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
                 RateLimitPartition.GetFixedWindowLimiter(
-                    context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+                    ClientAddress.RateLimitPartition(context),
                     _ => new FixedWindowRateLimiterOptions { PermitLimit = globalPerMinute, Window = TimeSpan.FromMinutes(1) }));
 
             // Stricter limit for auth endpoints (login/register/refresh/forgot).
             options.AddPolicy(AuthRateLimitPolicy, context =>
                 RateLimitPartition.GetFixedWindowLimiter(
-                    context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+                    ClientAddress.RateLimitPartition(context),
                     _ => new FixedWindowRateLimiterOptions { PermitLimit = authPerMinute, Window = TimeSpan.FromMinutes(1) }));
         });
     }

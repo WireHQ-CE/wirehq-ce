@@ -50,6 +50,7 @@ public sealed partial class ApplicationDbContext(
     public DbSet<RecoveryCode> RecoveryCodes => Set<RecoveryCode>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
+    public DbSet<PhoneVerification> PhoneVerifications => Set<PhoneVerification>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<AuditChainAnchor> AuditChainAnchors => Set<AuditChainAnchor>();
 

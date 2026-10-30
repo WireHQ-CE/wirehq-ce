@@ -65,6 +65,10 @@ public static class MarketplaceModuleCatalog
     // routing — a distinct, later baseline than Chat Alerts (do NOT reuse NotificationsBaseline).
     private const string AdvancedNotificationsBaseline = "0.90.0";
 
+    // SMS Integration (docs/36 Wave 4). Placeholder MinCe — the card is "coming soon" and not activatable until Slice D
+    // ships STOP/consent + the A2P gate; set the real baseline when the card flips to Available at that cut (docs/36 §9).
+    private const string SmsBaseline = "0.91.0";
+
     private static string Docs(string slug) => $"docs/marketplace/{slug}/README.md";
     private static string Changelog(string slug) => $"docs/marketplace/{slug}/CHANGELOG.md";
 
@@ -108,6 +112,14 @@ public static class MarketplaceModuleCatalog
         Manifest("advanced-notifications", "Advanced Notifications", "Notifications",
             "Match several event patterns in a single notification rule, create email rules beyond the free-tier limit, coalesce events into daily or weekly digests, hold non-urgent alerts during quiet hours, and escalate to a backup channel or on-call role when no one acknowledges.",
             ModuleTier.Pro, ModuleStatus.Available, ModuleDelivery.GateOnly, minCe: AdvancedNotificationsBaseline),
+        // SMS Integration (docs/36 Wave 4) — the engine is kept-core (a GateOnly ModuleDefinition), but the card stays
+        // "coming soon" until Slice D ships STOP/consent + the A2P gate, at which point it flips to
+        // ModuleStatus.Available + ModuleDelivery.GateOnly. Until then the manifest carries a NULL delivery (the
+        // not-yet-built marker, which the catalogue tests treat as an un-backed placeholder) so the card is never shown
+        // buyable. Copy advertises only the compliance-safe highlights (docs/36 §1).
+        new("sms-integration", "SMS Integration", "Notifications", V1,
+            "Send critical alerts over SMS using your own Twilio or Vonage account — bring-your-own provider, critical-alert routing, and STOP/opt-out compliance. (SMS-based MFA is a separate authentication feature, not part of this module.)",
+            Docs("sms-integration"), Changelog("sms-integration"), SmsBaseline, ModuleTier.Pro, ModuleStatus.ComingSoon, Delivery: null),
 
         // --- Code-delivered set: shown for display, NOT activatable until the Architecture-B module runtime + the
         //     AGPL review (docs/33 §12/MM-8). Status = ComingSoon; the activation endpoint refuses them. ---

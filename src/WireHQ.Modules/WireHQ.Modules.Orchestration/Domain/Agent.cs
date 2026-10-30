@@ -53,6 +53,15 @@ public sealed class Agent : AggregateRoot, ITenantOwned, IAuditable, ISoftDeleta
     /// <summary>The agent's current client certificate (PEM, public). Rotated before expiry.</summary>
     public string CertificatePem { get; private set; } = null!;
 
+    /// <summary>
+    /// The fingerprint the agent rotated <i>away from</i>, still accepted until the agent proves it holds the new
+    /// certificate (its first heartbeat on it — <see cref="ConfirmCertificate"/>). Without this grace a lost rotate
+    /// response, or a crash before the agent persists the new cert, locks the agent out permanently: the server
+    /// would have swapped to a certificate the agent never received. Bounded by the old cert's own expiry, which
+    /// the auth handler still enforces. Null when no rotation is in flight.
+    /// </summary>
+    public string? PreviousCertificateFingerprint { get; private set; }
+
     public AgentStatus Status { get; private set; }
     public string? Platform { get; private set; }
     public string? Version { get; private set; }
@@ -92,11 +101,34 @@ public sealed class Agent : AggregateRoot, ITenantOwned, IAuditable, ISoftDeleta
         LastSeenAtUtc = at;
     }
 
-    /// <summary>Replaces the certificate (and its fingerprint) when the agent rotates before expiry.</summary>
-    public void RotateCertificate(string certificateFingerprint, string certificatePem)
+    /// <summary>
+    /// Replaces the certificate when the agent rotates before expiry. <paramref name="presentedFingerprint"/> is the
+    /// cert the rotate request authenticated with. Presenting the <i>current</i> cert is a normal rotation: it
+    /// becomes the previous (still accepted) one. Presenting the <i>previous</i> cert means the agent never
+    /// received or never persisted the last issued cert — that orphan is discarded and the previous cert keeps its
+    /// grace, so the agent can retry indefinitely until one rotation lands.
+    /// </summary>
+    public void RotateCertificate(string certificateFingerprint, string certificatePem, string presentedFingerprint)
     {
+        if (presentedFingerprint == CertificateFingerprint)
+        {
+            PreviousCertificateFingerprint = CertificateFingerprint;
+        }
+
         CertificateFingerprint = certificateFingerprint;
         CertificatePem = certificatePem;
+    }
+
+    /// <summary>
+    /// Ends a rotation's grace once the agent authenticates with its new certificate: from then on only the new
+    /// cert is accepted. A no-op unless <paramref name="presentedFingerprint"/> is the current certificate.
+    /// </summary>
+    public void ConfirmCertificate(string presentedFingerprint)
+    {
+        if (PreviousCertificateFingerprint is not null && presentedFingerprint == CertificateFingerprint)
+        {
+            PreviousCertificateFingerprint = null;
+        }
     }
 
     public void Disable() => Status = AgentStatus.Disabled;

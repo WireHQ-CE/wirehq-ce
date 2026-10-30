@@ -159,9 +159,19 @@ public sealed class AgentGatewayService(
         return new EnrollAgentResponse(agentId, issued.Value.CertificatePem, issued.Value.CaCertificatePem, issued.Value.NotAfterUtc);
     }
 
-    /// <summary>Re-keys an authenticated agent before its certificate expires (same CA, new leaf).</summary>
-    public async Task<Result<RotateCertResponse>> RotateAsync(Guid agentId, Guid organizationId, RotateCertRequest request, CancellationToken cancellationToken)
+    /// <summary>
+    /// Re-keys an authenticated agent before its certificate expires (same CA, new leaf). The cert the request
+    /// presented stays accepted until the agent heartbeats on the new one, so a lost response is retryable rather
+    /// than a lockout (<see cref="Agent.RotateCertificate"/>).
+    /// </summary>
+    public async Task<Result<RotateCertResponse>> RotateAsync(
+        Guid agentId, Guid organizationId, string presentedFingerprint, RotateCertRequest request, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(request.Csr))
+        {
+            return OrchestrationErrors.Agent.InvalidCertificate;
+        }
+
         var agent = await dbContext.Set<Agent>().FirstOrDefaultAsync(a => a.Id == agentId, cancellationToken);
         if (agent is null || !agent.IsActive)
         {
@@ -174,15 +184,20 @@ public sealed class AgentGatewayService(
             return issued.Error;
         }
 
-        agent.RotateCertificate(issued.Value.Sha256Fingerprint, issued.Value.CertificatePem);
-        audit.Record("orch.agent.cert_rotated", AuditOutcome.Success, nameof(Agent), agentId.ToString());
+        agent.RotateCertificate(issued.Value.Sha256Fingerprint, issued.Value.CertificatePem, presentedFingerprint);
+        audit.Record("orch.agent.cert_rotated", AuditOutcome.Success, nameof(Agent), agentId.ToString(),
+            new { notAfterUtc = issued.Value.NotAfterUtc });
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return new RotateCertResponse(issued.Value.CertificatePem, issued.Value.CaCertificatePem, issued.Value.NotAfterUtc);
     }
 
-    /// <summary>Records an authenticated agent's liveness + reported version.</summary>
-    public async Task<Result<HeartbeatResponse>> HeartbeatAsync(Guid agentId, HeartbeatRequest request, CancellationToken cancellationToken)
+    /// <summary>
+    /// Records an authenticated agent's liveness + reported version. A heartbeat on the current certificate also
+    /// ends any rotation grace: the agent has proven it holds the new cert, so the old one stops working.
+    /// </summary>
+    public async Task<Result<HeartbeatResponse>> HeartbeatAsync(
+        Guid agentId, string presentedFingerprint, HeartbeatRequest request, CancellationToken cancellationToken)
     {
         var agent = await dbContext.Set<Agent>().FirstOrDefaultAsync(a => a.Id == agentId, cancellationToken);
         if (agent is null || !agent.IsActive)
@@ -191,6 +206,7 @@ public sealed class AgentGatewayService(
         }
 
         agent.Heartbeat(request.Version, clock.UtcNow);
+        agent.ConfirmCertificate(presentedFingerprint);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return new HeartbeatResponse("ok");

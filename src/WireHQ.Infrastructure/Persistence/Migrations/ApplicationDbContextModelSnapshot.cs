@@ -417,6 +417,12 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("service_status_alerts");
 
+                    b.Property<bool>("SmsAlerts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("sms_alerts");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
@@ -474,6 +480,63 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_password_reset_tokens_user_id");
 
                     b.ToTable("password_reset_tokens", "identity");
+                });
+
+            modelBuilder.Entity("WireHQ.Domain.Identity.PhoneVerification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("code_hash");
+
+                    b.Property<DateTimeOffset?>("ConsumedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumed_at_utc");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("PhoneE164")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("phone_e164");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_phone_verifications");
+
+                    b.HasIndex("OrganizationId")
+                        .HasDatabaseName("ix_phone_verifications_organization_id");
+
+                    b.HasIndex("PhoneE164", "CreatedAtUtc")
+                        .HasDatabaseName("ix_phone_verifications_phone_created");
+
+                    b.HasIndex("UserId", "CreatedAtUtc")
+                        .HasDatabaseName("ix_phone_verifications_user_created");
+
+                    b.ToTable("phone_verifications", "identity");
                 });
 
             modelBuilder.Entity("WireHQ.Domain.Identity.User", b =>
@@ -566,6 +629,14 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)")
                         .HasColumnName("phone");
+
+                    b.Property<bool>("PhoneVerified")
+                        .HasColumnType("boolean")
+                        .HasColumnName("phone_verified");
+
+                    b.Property<DateTimeOffset?>("PhoneVerifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("phone_verified_at_utc");
 
                     b.Property<string>("PlatformRole")
                         .IsRequired()
@@ -816,6 +887,19 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTimeOffset?>("A2pAttestedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("a2p_attested_at_utc");
+
+                    b.Property<Guid?>("A2pAttestedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("a2p_attested_by");
+
+                    b.Property<string>("A2pReference")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("a2p_reference");
+
                     b.Property<string>("ChannelKind")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -849,9 +933,50 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("from_value");
 
+                    b.Property<DateTimeOffset?>("InboundCurrentTokenVerifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("inbound_current_token_verified_at_utc");
+
+                    b.Property<DateTimeOffset?>("InboundLastRejectedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("inbound_last_rejected_at_utc");
+
+                    b.Property<DateTimeOffset?>("InboundPreviousTokenSeenAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("inbound_previous_token_seen_at_utc");
+
+                    b.Property<int>("InboundRejectedCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("inbound_rejected_count");
+
+                    b.Property<string>("InboundWebhookTokenHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("inbound_webhook_token_hash");
+
+                    b.Property<DateTimeOffset?>("InboundWebhookTokenMintedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("inbound_webhook_token_minted_at_utc");
+
+                    b.Property<string>("InboundWebhookTokenPrefix")
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)")
+                        .HasColumnName("inbound_webhook_token_prefix");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
+
+                    b.Property<DateTimeOffset?>("PreviousInboundWebhookTokenExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("previous_inbound_webhook_token_expires_at_utc");
+
+                    b.Property<string>("PreviousInboundWebhookTokenHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("previous_inbound_webhook_token_hash");
 
                     b.Property<string>("ProviderKind")
                         .IsRequired()
@@ -869,6 +994,14 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_notification_channel_configs");
+
+                    b.HasIndex("InboundWebhookTokenHash")
+                        .HasDatabaseName("ix_notification_channel_configs_inbound_token")
+                        .HasFilter("inbound_webhook_token_hash IS NOT NULL");
+
+                    b.HasIndex("PreviousInboundWebhookTokenHash")
+                        .HasDatabaseName("ix_notification_channel_configs_prev_inbound_token")
+                        .HasFilter("previous_inbound_webhook_token_hash IS NOT NULL");
 
                     b.HasIndex("OrganizationId", "ChannelKind")
                         .IsUnique()
@@ -964,6 +1097,11 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
+
+                    b.Property<string>("ProviderMessageId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("provider_message_id");
 
                     b.Property<TimeOnly?>("QuietHoursEnd")
                         .HasColumnType("time without time zone")
@@ -1265,6 +1403,110 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                         .HasName("pk_notification_rule_patterns");
 
                     b.ToTable("notification_rule_patterns", "identity");
+                });
+
+            modelBuilder.Entity("WireHQ.Domain.Notifications.SmsConsent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Consented")
+                        .HasColumnType("boolean")
+                        .HasColumnName("consented");
+
+                    b.Property<DateTimeOffset?>("ConsentedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consented_at_utc");
+
+                    b.Property<string>("DisclosureVersion")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("disclosure_version");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<DateTimeOffset?>("RevokedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at_utc");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sms_consents");
+
+                    b.HasIndex("OrganizationId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_sms_consents_organization_id_user_id");
+
+                    b.ToTable("sms_consents", "identity");
+                });
+
+            modelBuilder.Entity("WireHQ.Domain.Notifications.SmsOptOut", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ClearedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cleared_at_utc");
+
+                    b.Property<string>("ClearedKeyword")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("cleared_keyword");
+
+                    b.Property<string>("Keyword")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("keyword");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("PhoneE164")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("phone_e164");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Sender")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sender");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("source");
+
+                    b.Property<DateTimeOffset>("SuppressedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("suppressed_at_utc");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sms_opt_outs");
+
+                    b.HasIndex("OrganizationId", "PhoneE164")
+                        .HasDatabaseName("ix_sms_opt_outs_organization_id_phone");
+
+                    b.ToTable("sms_opt_outs", "identity");
                 });
 
             modelBuilder.Entity("WireHQ.Domain.Onboarding.OnboardingProfile", b =>
@@ -2189,6 +2431,11 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("platform");
 
+                    b.Property<string>("PreviousCertificateFingerprint")
+                        .HasMaxLength(95)
+                        .HasColumnType("character varying(95)")
+                        .HasColumnName("previous_certificate_fingerprint");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -2214,6 +2461,9 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                     b.HasIndex("CertificateFingerprint")
                         .IsUnique()
                         .HasDatabaseName("ix_agents_certificate_fingerprint");
+
+                    b.HasIndex("PreviousCertificateFingerprint")
+                        .HasDatabaseName("ix_agents_previous_certificate_fingerprint");
 
                     b.HasIndex("OrganizationId", "Id")
                         .HasDatabaseName("ix_agents_organization_id_id");
@@ -3260,8 +3510,36 @@ namespace WireHQ.Infrastructure.Persistence.Migrations
                                 .HasConstraintName("fk_users_users_id");
                         });
 
+                    b.OwnsOne("WireHQ.Domain.ValueObjects.PhoneNumber", "PhoneE164", b1 =>
+                        {
+                            b1.Property<Guid>("UserId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Value")
+                                .IsRequired()
+                                .HasMaxLength(16)
+                                .HasColumnType("character varying(16)")
+                                .HasColumnName("phone_e164");
+
+                            b1.HasKey("UserId");
+
+                            b1.HasIndex("Value")
+                                .IsUnique()
+                                .HasDatabaseName("ix_users_phone_e164")
+                                .HasFilter("phone_verified = true");
+
+                            b1.ToTable("users", "identity");
+
+                            b1.WithOwner()
+                                .HasForeignKey("UserId")
+                                .HasConstraintName("fk_users_users_id");
+                        });
+
                     b.Navigation("Email")
                         .IsRequired();
+
+                    b.Navigation("PhoneE164");
                 });
 
             modelBuilder.Entity("WireHQ.Domain.Memberships.Membership", b =>

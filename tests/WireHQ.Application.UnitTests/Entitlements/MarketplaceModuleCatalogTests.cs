@@ -67,6 +67,25 @@ public sealed class MarketplaceModuleCatalogTests
         }
     }
 
+    /// <summary>
+    /// A ComingSoon module must not be reachable through checkout. Buyability used to be decided entirely by the
+    /// presence of an operator-configured <c>ModulePrice</c> row, so a pre-sale price — or one left behind by a module
+    /// pulled back — made a "coming soon" card genuinely purchasable. It would then also ACTIVATE, because
+    /// <c>ActivatedModuleEvaluator</c> grants on <c>ModuleCatalog</c> membership and never consults manifest Status.
+    /// The catalogue's coming-soon state has to be enforced, not merely rendered.
+    /// </summary>
+    [Fact]
+    public void Coming_soon_modules_are_identifiable_so_checkout_can_refuse_them()
+    {
+        var comingSoon = MarketplaceModuleCatalog.Manifests.Where(m => m.Status == ModuleStatus.ComingSoon).ToList();
+        comingSoon.Should().NotBeEmpty("this guard is pointless if nothing is ever coming-soon");
+
+        // sms-integration is the live case this exists for: it is registered in ModuleCatalog as GateOnly (so a licence
+        // WOULD grant notifications.sms) while its manifest is deliberately still ComingSoon pending the go-live gate.
+        comingSoon.Should().Contain(m => m.Slug == "sms-integration",
+            "SMS must stay unbuyable until the send gate flips — it is backed server-side, so nothing else stops a sale");
+    }
+
     [Fact]
     public void Every_manifest_has_display_and_lifecycle_metadata()
     {

@@ -26,8 +26,12 @@ export function UpdateModal({ status, onClose }: { status: UpdateStatus; onClose
   // it has no GHCR images to pull), while the SaaS/VPS operator rolls prebuilt images. Kept in sync with the CE
   // README's "Updating" section. (docs/30 U-8 / docs/17)
   const isCommunity = EDITION === 'community';
+  // The CE path goes through deploy/update.sh, which takes a database backup FIRST and refuses to continue if that
+  // fails. This used to print the raw `docker compose … up -d --build` — which skipped the backup the README makes
+  // mandatory, and did so on the very release where the CE gained a migration chain capable of renames and data
+  // steps. The SaaS/VPS path already backs up inside deploy.sh.
   const command = isCommunity
-    ? 'git pull && docker compose -f deploy/docker-compose.yml up -d --build'
+    ? 'git pull && ./deploy/update.sh'
     : `./deploy/deploy.sh ${status.latestVersion}`;
   const webVersion = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : null;
   const partialUpgrade = webVersion !== null && webVersion !== status.currentVersion;

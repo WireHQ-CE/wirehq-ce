@@ -19,5 +19,10 @@ public interface IAuditWriter
         // Override the correlation/request id for this entry. Defaults to the ambient request's id; pass an
         // explicit one when the action is driven by background/edge work that should chain to a different,
         // originating request (e.g. an agent job result chaining to the deploy that enqueued it). (ADR-030)
-        string? correlationId = null);
+        string? correlationId = null,
+        // Override the owning organisation. Defaults to the ambient tenant; pass an explicit one from an
+        // ITenantUnscopedRequest, where there is no ambient tenant and the entry would otherwise be written with a
+        // NULL organization_id — invisible to the org it belongs to, since the audit console filters on that column.
+        // (The inbound SMS webhook is anonymous and resolves its org from the request itself.)
+        Guid? organizationId = null);
 }

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using WireHQ.Domain.Notifications;
+using WireHQ.Domain.ValueObjects;
 
 namespace WireHQ.Infrastructure.Persistence.Configurations;
 
@@ -175,7 +176,10 @@ public sealed class NotificationDeliveryConfiguration : IEntityTypeConfiguration
         builder.Property(d => d.RenderedSubject).HasMaxLength(NotificationDelivery.MaxSubjectLength).IsRequired();
         builder.Property(d => d.RenderedBody).IsRequired();
         builder.Property(d => d.DedupValue).HasMaxLength(64);
+        // varchar(16) still fits every member — "Unresolved" (W4) is 10 characters, so the new state needs no widening.
         builder.Property(d => d.Status).HasConversion<string>().HasMaxLength(16).IsRequired();
+        // The provider's message id (Twilio SM… SID), recorded on send or on the status callback (W4).
+        builder.Property(d => d.ProviderMessageId).HasMaxLength(NotificationDelivery.MaxProviderMessageIdLength);
         builder.Property(d => d.Attempts).IsRequired();
         builder.Property(d => d.LastError).HasMaxLength(NotificationDelivery.MaxErrorLength);
 
@@ -208,11 +212,93 @@ public sealed class NotificationChannelConfigConfiguration : IEntityTypeConfigur
         builder.Property(c => c.DestinationUrl).HasMaxLength(NotificationChannelConfig.MaxUrlLength);
         builder.Property(c => c.CredentialCiphertext).HasMaxLength(1024);
         builder.Property(c => c.FromValue).HasMaxLength(NotificationChannelConfig.MaxFromLength);
+        // SHA-256 hex (64 chars) of the inbound webhook token (Wave 4 Slice D); nullable until minted. The migration
+        // adds it nullable, so pre-existing SMS/chat configs are unaffected.
+        builder.Property(c => c.InboundWebhookTokenHash).HasMaxLength(128);
+        // A2P/10DLC attestation (Wave 4 Slice D §4.6); all nullable — the migration adds them so existing rows are
+        // un-attested (which the pre-send gate treats as "hold").
+        builder.Property(c => c.A2pAttestedAtUtc);
+        builder.Property(c => c.A2pAttestedBy);
+        builder.Property(c => c.A2pReference).HasMaxLength(NotificationChannelConfig.MaxA2pReferenceLength);
+        // Inbound webhook token lifecycle (Wave 4 W2). All additive + nullable, so existing rows keep working: an org
+        // that already has a token simply has no prefix/mint timestamp and no readiness proof — which correctly reads
+        // as "not ready" to the send-path hold.
+        builder.Property(c => c.InboundWebhookTokenPrefix)
+            .HasMaxLength(NotificationChannelConfig.InboundWebhookTokenPrefixLength);
+        builder.Property(c => c.InboundWebhookTokenMintedAtUtc);
+        builder.Property(c => c.PreviousInboundWebhookTokenHash).HasMaxLength(128);
+        builder.Property(c => c.PreviousInboundWebhookTokenExpiresAtUtc);
+        builder.Property(c => c.InboundCurrentTokenVerifiedAtUtc);
+        builder.Property(c => c.InboundPreviousTokenSeenAtUtc);
+        builder.Property(c => c.InboundLastRejectedAtUtc);
+        builder.Property(c => c.InboundRejectedCount).IsRequired().HasDefaultValue(0);
         builder.Property(c => c.Enabled).IsRequired();
 
         builder.HasIndex(c => new { c.OrganizationId, c.ChannelKind })
             .IsUnique()
             .HasDatabaseName("ux_notification_channel_configs_org_channel");
+
+        // The inbound webhook resolves an org by token hash on an ANONYMOUS, cross-tenant IgnoreQueryFilters scan and
+        // had no index at all. Filtered so they cost nothing for the (many) orgs with no SMS token.
+        builder.HasIndex(c => c.InboundWebhookTokenHash)
+            .HasDatabaseName("ix_notification_channel_configs_inbound_token")
+            .HasFilter("inbound_webhook_token_hash IS NOT NULL");
+        builder.HasIndex(c => c.PreviousInboundWebhookTokenHash)
+            .HasDatabaseName("ix_notification_channel_configs_prev_inbound_token")
+            .HasFilter("previous_inbound_webhook_token_hash IS NOT NULL");
+    }
+}
+
+public sealed class SmsOptOutConfiguration : IEntityTypeConfiguration<SmsOptOut>
+{
+    public void Configure(EntityTypeBuilder<SmsOptOut> builder)
+    {
+        // The append-only SMS suppression ledger (docs/36 §4.3/§8, Wave 4 Slice D). Tenant-owned (organization_id) in
+        // the reused `identity` schema, so rls.sql's data-driven tenant_isolation + wirehq_app grants cover it
+        // automatically — no rls.sql change. Never mutated except the START clear (ClearedAtUtc); rows are never deleted.
+        builder.ToTable("sms_opt_outs", "identity");
+        builder.HasKey(o => o.Id);
+        builder.Property(o => o.Id).ValueGeneratedNever();
+
+        builder.Property(o => o.OrganizationId).IsRequired();
+        builder.Property(o => o.PhoneE164).HasMaxLength(PhoneNumber.MaxLength).IsRequired();
+        builder.Property(o => o.Sender).HasMaxLength(NotificationChannelConfig.MaxFromLength);
+        builder.Property(o => o.Source).HasConversion<string>().HasMaxLength(16).IsRequired();
+        builder.Property(o => o.Keyword).HasMaxLength(32);
+        // Kept separate from Keyword so a cleared row still records why the subscriber opted OUT (W2).
+        builder.Property(o => o.ClearedKeyword).HasMaxLength(32);
+        builder.Property(o => o.Reason).HasMaxLength(256);
+        builder.Property(o => o.SuppressedAtUtc).IsRequired();
+        builder.Property(o => o.ClearedAtUtc);
+
+        // The (org, number) index backs both the resolve-time pre-filter and the send-time authoritative check that ask
+        // "is this (org, number) currently suppressed?". The organization_id prefix also satisfies the RLS loop's key.
+        builder.HasIndex(o => new { o.OrganizationId, o.PhoneE164 }).HasDatabaseName("ix_sms_opt_outs_organization_id_phone");
+    }
+}
+
+public sealed class SmsConsentConfiguration : IEntityTypeConfiguration<SmsConsent>
+{
+    public void Configure(EntityTypeBuilder<SmsConsent> builder)
+    {
+        // Per-(org, user) SMS consent (docs/36 §4.1, Wave 4 Slice D precondition D-3). Tenant-owned (organization_id) in
+        // the reused `identity` schema, so rls.sql's data-driven tenant_isolation + wirehq_app grants cover it
+        // automatically — no rls.sql change. One row per (org, user).
+        builder.ToTable("sms_consents", "identity");
+        builder.HasKey(c => c.Id);
+        builder.Property(c => c.Id).ValueGeneratedNever();
+
+        builder.Property(c => c.OrganizationId).IsRequired();
+        builder.Property(c => c.UserId).IsRequired();
+        builder.Property(c => c.Consented).IsRequired();
+        builder.Property(c => c.ConsentedAtUtc);
+        builder.Property(c => c.RevokedAtUtc);
+        builder.Property(c => c.DisclosureVersion).HasMaxLength(32);
+        builder.Property(c => c.UpdatedAtUtc).IsRequired();
+
+        builder.HasIndex(c => new { c.OrganizationId, c.UserId })
+            .IsUnique()
+            .HasDatabaseName("ux_sms_consents_organization_id_user_id");
     }
 }
 

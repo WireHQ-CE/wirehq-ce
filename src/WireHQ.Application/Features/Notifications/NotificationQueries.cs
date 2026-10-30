@@ -105,7 +105,9 @@ public sealed class ListNotificationDeliveriesQueryHandler(IApplicationDbContext
 
 // --- Curated event catalog (the rule-editor picker) ---
 
-public sealed record NotificationEventTypeDto(string Pattern, string Label, string Group);
+/// <summary>One curated event the rule editor offers. <see cref="IsCritical"/> marks a literal critical action (docs/36
+/// §6) — the ONLY events an SMS rule may target; the editor filters to these when the channel is SMS.</summary>
+public sealed record NotificationEventTypeDto(string Pattern, string Label, string Group, bool IsCritical);
 
 public sealed record ListNotificationEventTypesQuery : IQuery<IReadOnlyList<NotificationEventTypeDto>>, IAuthorizedRequest
 {
@@ -118,18 +120,22 @@ public sealed class ListNotificationEventTypesQueryHandler
     // The Wave 1 curated set: low-frequency security / directory / lifecycle events (docs/35 §4.6 — high-frequency
     // actions are deliberately excluded from the routable set to avoid a per-recipient storm). Display strings only —
     // the patterns are audit-action globs, safe to ship in the kept-core CE (no forbidden type-name substrings).
+    // These broad globs are for Email/Chat rules and are NOT critical (an SMS rule must pick a literal critical action).
+    // The curated critical events (docs/36 §6, IsCritical=true) are appended from the domain's single source of truth
+    // (NotificationCriticalEvents) so the editor's SMS picker and the server validator can never drift.
     private static readonly IReadOnlyList<NotificationEventTypeDto> Catalog =
     [
-        new("mfa.*", "Multi-factor authentication changes", "Security"),
-        new("identity.users.*", "User lifecycle (invited, updated, removed)", "Directory"),
-        new("identity.roles.*", "Role changes", "Directory"),
-        new("identity.sso.*", "Single sign-on configuration", "Directory"),
-        new("identity.scim.*", "SCIM provisioning", "Directory"),
-        new("identity.ldap.*", "LDAP / Active Directory sync", "Directory"),
-        new("policy.access.*", "Access-policy changes", "Access"),
-        new("organization.*", "Organization changes", "Organization"),
-        new("api.keys.*", "API-key changes", "Integrations"),
-        new("webhooks.*", "Webhook changes", "Integrations"),
+        new("mfa.*", "Multi-factor authentication changes", "Security", false),
+        new("identity.users.*", "User lifecycle (invited, updated, removed)", "Directory", false),
+        new("identity.roles.*", "Role changes", "Directory", false),
+        new("identity.sso.*", "Single sign-on configuration", "Directory", false),
+        new("identity.scim.*", "SCIM provisioning", "Directory", false),
+        new("identity.ldap.*", "LDAP / Active Directory sync", "Directory", false),
+        new("policy.access.*", "Access-policy changes", "Access", false),
+        new("organization.*", "Organization changes", "Organization", false),
+        new("api.keys.*", "API-key changes", "Integrations", false),
+        new("webhooks.*", "Webhook changes", "Integrations", false),
+        .. NotificationCriticalEvents.All.Select(e => new NotificationEventTypeDto(e.Action, e.Label, e.Group, true)),
     ];
 
     public Task<Result<IReadOnlyList<NotificationEventTypeDto>>> Handle(ListNotificationEventTypesQuery query, CancellationToken cancellationToken) =>

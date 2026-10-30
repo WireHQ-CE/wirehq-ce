@@ -49,7 +49,8 @@ public sealed class AgentCertificateAuthenticationHandler(
 
         var fingerprint = clientCertificate.GetCertHashString(HashAlgorithmName.SHA256);
 
-        // Resolve the fingerprint → agent cross-tenant, isolated under bypass so the request scope is never
+        // Resolve the fingerprint → agent cross-tenant — the current cert, or the one it is rotating away from
+        // (accepted only until the agent first authenticates on the new one; Agent.PreviousCertificateFingerprint), isolated under bypass so the request scope is never
         // tainted (fail-closed). The agents table is RLS-protected; bypass is the legitimate edge lookup.
         Agent? agent;
         using (var lookupScope = scopeFactory.CreateScope())
@@ -59,7 +60,7 @@ public sealed class AgentCertificateAuthenticationHandler(
             agent = await lookupDb.Set<Agent>()
                 .IgnoreQueryFilters()
                 .AsNoTracking()
-                .FirstOrDefaultAsync(a => a.CertificateFingerprint == fingerprint);
+                .FirstOrDefaultAsync(a => a.CertificateFingerprint == fingerprint || a.PreviousCertificateFingerprint == fingerprint);
         }
 
         if (agent is null || !agent.IsActive)
@@ -75,6 +76,7 @@ public sealed class AgentCertificateAuthenticationHandler(
             [
                 new Claim(AgentGatewayClaims.AgentId, agent.Id.ToString()),
                 new Claim(AgentGatewayClaims.OrganizationId, agent.OrganizationId.ToString()),
+                new Claim(AgentGatewayClaims.CertificateFingerprint, fingerprint),
             ],
             Scheme.Name);
 

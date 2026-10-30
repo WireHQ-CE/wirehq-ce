@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -11,18 +12,25 @@ import (
 )
 
 // Version is reported on heartbeat. Bumped per agent release.
-const Version = "0.1.0"
+const Version = "0.2.0"
 
-// Loop is the agent's main cycle: heartbeat, drain signed jobs (verify → apply → report), push telemetry.
+// Loop is the agent's main cycle: renew the client cert when due, heartbeat, drain signed jobs (verify → apply →
+// report), push telemetry.
 type Loop struct {
 	cfg     Config
 	client  *Client
 	applier *Applier
 	caCert  []byte
+
+	// nextRotateAttempt throttles certificate renewal after a failure (and the expired-cert warning).
+	nextRotateAttempt time.Time
 }
 
 // NewLoop wires the run loop from an enrolled state directory.
 func NewLoop(cfg Config) (*Loop, error) {
+	if err := recoverPendingRotation(cfg); err != nil {
+		return nil, fmt.Errorf("recover interrupted certificate rotation: %w", err)
+	}
 	if !cfg.IsEnrolled() {
 		return nil, fmt.Errorf("agent is not enrolled (run `wirehq-agent enroll` first)")
 	}
@@ -58,6 +66,8 @@ func (l *Loop) Run(ctx context.Context, interval time.Duration) error {
 func (l *Loop) Once(ctx context.Context) { l.tick(ctx) }
 
 func (l *Loop) tick(ctx context.Context) {
+	l.maybeRotate(ctx, time.Now())
+
 	if err := l.client.Heartbeat(ctx, Version); err != nil {
 		log.Printf("heartbeat failed: %v", err)
 	}
@@ -75,6 +85,44 @@ func (l *Loop) tick(ctx context.Context) {
 	l.processTasks(ctx)
 
 	l.reportStatus(ctx)
+}
+
+// maybeRotate renews the client certificate once it is due (rotationDue). An already-expired certificate cannot
+// be renewed — the gateway rejects it outright — so that case only logs how to recover.
+func (l *Loop) maybeRotate(ctx context.Context, now time.Time) {
+	if now.Before(l.nextRotateAttempt) {
+		return
+	}
+	leaf := l.client.Leaf()
+	if now.After(leaf.NotAfter) {
+		log.Printf("client certificate EXPIRED at %s: this agent can no longer authenticate. Re-enroll it: mint a token "+
+			"in WireHQ (WireGuard → Agents → Enroll agent) and run `wirehq-agent enroll --server %s --token <token>`",
+			leaf.NotAfter.UTC().Format(time.RFC3339), l.cfg.Server)
+		l.nextRotateAttempt = now.Add(rotateRetryBackoff)
+		return
+	}
+	if !rotationDue(leaf, now) {
+		return
+	}
+
+	renewed, caPEM, err := rotateCertificate(ctx, l.cfg, l.client)
+	if err != nil {
+		log.Printf("certificate renewal failed (expires %s; retrying in %s): %v",
+			leaf.NotAfter.UTC().Format(time.RFC3339), rotateRetryBackoff, err)
+		l.nextRotateAttempt = now.Add(rotateRetryBackoff)
+		return
+	}
+	log.Printf("client certificate renewed; now valid until %s", renewed.NotAfter.UTC().Format(time.RFC3339))
+
+	// The org CA is long-lived, but if the gateway ever hands back a different one, adopt it: it is the key that
+	// verifies job bundles. Best-effort — the identity itself is already safely persisted.
+	if len(caPEM) > 0 && !bytes.Equal(caPEM, l.caCert) {
+		if err := writeFileAtomic(l.cfg.caPath(), caPEM, 0o644); err != nil {
+			log.Printf("store updated CA certificate failed: %v", err)
+			return
+		}
+		l.caCert = caPEM
+	}
 }
 
 // reportStatus reports per-interface drift — the current on-disk config vs what the agent last applied — for

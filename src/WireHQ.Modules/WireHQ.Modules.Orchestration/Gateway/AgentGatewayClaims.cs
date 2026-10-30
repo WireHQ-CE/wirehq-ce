@@ -9,4 +9,7 @@ public static class AgentGatewayClaims
 {
     public const string AgentId = "wirehq:agent_id";
     public const string OrganizationId = "wirehq:agent_org";
+
+    /// <summary>The SHA-256 fingerprint of the client cert this request presented — current or, mid-rotation, previous.</summary>
+    public const string CertificateFingerprint = "wirehq:agent_cert_fp";
 }

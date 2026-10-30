@@ -290,7 +290,20 @@ try
     //   dotnet WireHQ.Api.dll --migrate
     if (args.Contains("--migrate"))
     {
-        await app.InitialiseDatabaseAsync();
+        // A migration precondition failure is an OPERATOR message, not a crash. Handled here, ahead of the
+        // generic catch below: that one logs "WireHQ API terminated unexpectedly" plus a stack trace, which
+        // to a self-hoster reads as broken software and pushes them toward destructive guesses — and the
+        // only "won't start" remedy the CE README used to show was `down -v`, which deletes their data.
+        try
+        {
+            await app.InitialiseDatabaseAsync();
+        }
+        catch (DatabaseMigrationPreconditionException ex)
+        {
+            await Console.Error.WriteLineAsync(ex.OperatorMessage);
+            Environment.ExitCode = 1;
+        }
+
         return;
     }
 
@@ -305,17 +318,14 @@ try
         return;
     }
 
-    // Trust the reverse proxy's forwarded headers FIRST, so the rest of the pipeline sees the original
-    // scheme + client IP. TLS terminates at the edge (the user's HAProxy/nginx → the web container's
-    // nginx); without this the API only ever sees http, so the refresh cookie wouldn't be marked Secure
-    // and the per-IP rate limiter would bucket every request under the proxy's address. The API is only
-    // reachable through nginx, so we trust any forwarding hop (clear the default loopback-only allow-list).
-    var forwardedHeaders = new ForwardedHeadersOptions
-    {
-        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
-    };
-    forwardedHeaders.KnownNetworks.Clear();
-    forwardedHeaders.KnownProxies.Clear();
+    // Resolve the original scheme + client IP from the proxy chain FIRST, so the rest of the pipeline sees them.
+    // TLS terminates at the edge (HAProxy → host nginx → the web container's nginx); without this the API only
+    // ever sees http (the refresh cookie would not be marked Secure) and the per-IP rate limiter, audit and
+    // session IPs would all record a proxy. Only known proxies are trusted, and the whole chain is walked —
+    // see ClientAddress for why both halves matter.
+    var forwardedHeaders = WireHQ.Api.Security.ClientAddress.BuildForwardedHeadersOptions(app.Configuration);
+    app.Logger.LogInformation("Trusting X-Forwarded-* from: {TrustedProxies}",
+        WireHQ.Api.Security.ClientAddress.Describe(forwardedHeaders));
     app.UseForwardedHeaders(forwardedHeaders);
 
     app.UseExceptionHandler();
@@ -455,8 +465,12 @@ internal static class ProgramExtensions
                 .AddSource(AgentTelemetry.ActivitySourceName)
                 // DB query visibility: Npgsql emits command spans on its built-in "Npgsql" ActivitySource (docs/15 §6).
                 .AddSource("Npgsql")
-                .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation())
+                // Scrub the SMS inbound-webhook token out of the INBOUND request span. It is a show-once secret in the
+                // URL path, so it lands in url.path on every webhook POST; OTel's built-in redaction only covers query
+                // strings, and the Serilog policy is logs-only — bare instrumentation exported it verbatim.
+                .AddAspNetCoreInstrumentation(o => o.EnrichWithHttpRequest = ServerSpanScrubber.Enrich)
+                // Scrub the Twilio Account SID out of the outbound-request span URL (a path segment, docs/36 §5 D-2).
+                .AddHttpClientInstrumentation(o => o.EnrichWithHttpRequestMessage = HttpSpanScrubber.EnrichHttpSpan))
             .WithMetrics(metrics => metrics
                 // RED per use case (MetricsBehavior on the WireHQ.Application meter, docs/15 §7) — covers
                 // background-dispatched use cases too, not just HTTP routes.

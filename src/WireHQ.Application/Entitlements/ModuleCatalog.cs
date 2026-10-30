@@ -46,6 +46,11 @@ public static class ModuleCatalog
         // Advanced Notifications — advanced routing (docs/35 Wave 3), kept-core; a licence lights up the
         // notifications.routing gate. Slice A ships multi-pattern routing rules; later highlights follow.
         new("advanced-notifications", new HashSet<string> { PlanFeatures.NotificationsRouting }, ModuleDelivery.GateOnly),
+        // SMS Integration — SMS delivery via the operator's own Twilio/Vonage account (docs/36 Wave 4), kept-core; a
+        // licence lights up the notifications.sms gate. GateOnly (the engine ships in the CE), but its Marketplace card
+        // stays "coming soon" until Slice D ships STOP/consent + the A2P gate (the manifest carries a null delivery +
+        // ComingSoon status until then — docs/36 §9/§10).
+        new("sms-integration", new HashSet<string> { PlanFeatures.NotificationsSms }, ModuleDelivery.GateOnly),
 
         // Code-delivered — capability code is STRIPPED from the CE, so these unlock nothing until the phase-4
         // modules/ runtime ships their code (+ the AGPL review). Defined so the catalogue can show them

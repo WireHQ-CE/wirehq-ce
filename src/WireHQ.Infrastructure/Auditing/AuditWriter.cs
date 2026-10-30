@@ -26,12 +26,16 @@ public sealed class AuditWriter(
         string? targetType = null,
         string? targetId = null,
         object? changes = null,
-        string? correlationId = null)
+        string? correlationId = null,
+        Guid? organizationId = null)
     {
         var entry = AuditLog.Record(
             action: action,
             outcome: outcome,
-            organizationId: tenant.OrganizationId,
+            // An explicit org wins over the ambient tenant — the caller is tenant-unscoped background/edge work that
+            // resolved its own org, and without it the entry lands with organization_id = NULL and disappears from
+            // the owning org's audit console.
+            organizationId: organizationId ?? tenant.OrganizationId,
             actorUserId: currentUser.UserId,
             // Mark actions performed under impersonation distinctly; the platform.impersonation.started
             // audit event carries which operator is acting (and over which session). An API-key request has no

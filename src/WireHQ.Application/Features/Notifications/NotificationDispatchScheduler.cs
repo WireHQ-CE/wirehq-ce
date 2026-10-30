@@ -54,10 +54,16 @@ public sealed class NotificationDispatchScheduler(IServiceScopeFactory scopeFact
         var now = scope.ServiceProvider.GetRequiredService<IDateTimeProvider>().UtcNow;
         var channels = scope.ServiceProvider.GetServices<INotificationChannel>().ToDictionary(c => c.Kind);
         var effectiveFeatures = scope.ServiceProvider.GetRequiredService<IEffectiveFeatureSet>();
+        // The operator's SMS options (docs/36 §7/§2) — the cap (clamped to a finite floor + hard max in SendAsync) and
+        // the dark-boundary send switch (default OFF ⇒ SMS deliveries are Cancelled, not sent). Optional: absent
+        // registration ⇒ null ⇒ cap 0 (default floor) + sending disabled, so a minimal test scope never faults or sends.
+        var smsOptions = scope.ServiceProvider.GetService<SmsNotificationOptions>();
+        var smsConfiguredCap = smsOptions?.DailyCapPerOrg ?? 0;
+        var smsSendEnabled = smsOptions?.Enabled ?? false;
 
         await ExpandAsync(dbContext, effectiveFeatures, now, cancellationToken);
         await FlushDigestsAsync(dbContext, effectiveFeatures, now, cancellationToken);
-        await SendAsync(dbContext, channels, effectiveFeatures, now, cancellationToken);
+        await SendAsync(dbContext, channels, effectiveFeatures, now, smsConfiguredCap, smsSendEnabled, cancellationToken);
         await EscalateAsync(dbContext, effectiveFeatures, now, cancellationToken);
 
         await dbContext.NotificationDeliveries
@@ -122,11 +128,16 @@ public sealed class NotificationDispatchScheduler(IServiceScopeFactory scopeFact
                 continue;
             }
 
-            // Email fans out to per-user recipients; a chat channel is a single shared destination (one delivery per
-            // event, not per user) — a shared channel post must not be multiplied by the audience size.
-            IReadOnlyList<string> recipients = rule.ChannelKind == ChannelKind.Email
-                ? await ResolveAudienceAsync(dbContext, rule.OrganizationId, rule.Audience, rule.AudienceRef, cancellationToken)
-                : [$"{rule.ChannelKind} channel"];
+            // Email + SMS fan out PER-RECIPIENT; a chat channel is a single shared destination (one delivery per event,
+            // not per user) — a shared channel post must not be multiplied by the audience size. SMS routes to the phone
+            // resolver, which is EMPTY in Slice A (docs/36 §10) — so SMS stays dark and never falls into Chat's one
+            // synthetic-recipient branch.
+            IReadOnlyList<string> recipients = rule.ChannelKind switch
+            {
+                ChannelKind.Email => await ResolveAudienceAsync(dbContext, rule.OrganizationId, rule.Audience, rule.AudienceRef, cancellationToken),
+                ChannelKind.Sms => await ResolveSmsAudienceAsync(dbContext, rule.OrganizationId, rule.Audience, rule.AudienceRef, cancellationToken),
+                _ => [$"{rule.ChannelKind} channel"],
+            };
 
             foreach (var recipient in recipients)
             {
@@ -211,11 +222,15 @@ public sealed class NotificationDispatchScheduler(IServiceScopeFactory scopeFact
             {
                 var (subject, body) = BuildDigest(rule, jobs);
 
-                // Org-scoped recipients (blocker B-2/#23) via the SAME helper immediate delivery uses — Chat stays one
-                // synthetic recipient (a digest posts once, not per user); Email fans per verified user.
-                IReadOnlyList<string> recipients = rule.ChannelKind == ChannelKind.Email
-                    ? await ResolveAudienceAsync(dbContext, rule.OrganizationId, rule.Audience, rule.AudienceRef, cancellationToken)
-                    : [$"{rule.ChannelKind} channel"];
+                // Org-scoped recipients (blocker B-2/#23) via the SAME helpers immediate delivery uses — Chat stays one
+                // synthetic recipient (a digest posts once, not per user); Email fans per verified user; SMS routes to the
+                // phone resolver, EMPTY in Slice A (docs/36 §10) — dark, never Chat's synthetic recipient.
+                IReadOnlyList<string> recipients = rule.ChannelKind switch
+                {
+                    ChannelKind.Email => await ResolveAudienceAsync(dbContext, rule.OrganizationId, rule.Audience, rule.AudienceRef, cancellationToken),
+                    ChannelKind.Sms => await ResolveSmsAudienceAsync(dbContext, rule.OrganizationId, rule.Audience, rule.AudienceRef, cancellationToken),
+                    _ => [$"{rule.ChannelKind} channel"],
+                };
 
                 foreach (var recipient in recipients)
                 {
@@ -343,9 +358,15 @@ public sealed class NotificationDispatchScheduler(IServiceScopeFactory scopeFact
             if (channelLive)
             {
                 var stepFeatures = StepRequiredFeatures(step.ChannelKind);
-                IReadOnlyList<string> recipients = step.ChannelKind == ChannelKind.Email
-                    ? await ResolveAudienceAsync(dbContext, job.OrganizationId, step.Audience, step.AudienceRef, cancellationToken)
-                    : [$"{step.ChannelKind} channel"];
+                // SMS escalation steps are hard-rejected at author time (docs/36 §10, kept), so this Sms arm is
+                // defence-in-depth: were one ever queued it routes to the EMPTY phone resolver (dark), never Chat's
+                // synthetic recipient.
+                IReadOnlyList<string> recipients = step.ChannelKind switch
+                {
+                    ChannelKind.Email => await ResolveAudienceAsync(dbContext, job.OrganizationId, step.Audience, step.AudienceRef, cancellationToken),
+                    ChannelKind.Sms => await ResolveSmsAudienceAsync(dbContext, job.OrganizationId, step.Audience, step.AudienceRef, cancellationToken),
+                    _ => [$"{step.ChannelKind} channel"],
+                };
 
                 foreach (var recipient in recipients)
                 {
@@ -415,10 +436,65 @@ public sealed class NotificationDispatchScheduler(IServiceScopeFactory scopeFact
             .ToList();
     }
 
+    /// <summary>Resolve the phone-number audience for an SMS rule/step (docs/36 §10, Slice B). <b>Org-scoped</b> (an
+    /// EXPLICIT <c>OrganizationId</c> predicate, never a cross-tenant <c>IgnoreQueryFilters</c> join — blocker B-2, the
+    /// same class as <see cref="ResolveAudienceAsync"/> since the drain runs under <c>SetBypass()</c>), and filtered to
+    /// verified-AND-consented numbers via the unit-tested <see cref="SmsAudience.Select"/> (ownership ≠ consent, docs/36
+    /// §4). A user with no preferences row is default-OFF ⇒ excluded. The <c>OptedInUsers</c>/<c>Role</c> audience
+    /// selects WHO; SMS consent is required universally on top. (Slice D pre-filters the append-only suppression ledger
+    /// here — the table doesn't exist yet.)</summary>
+    private static async Task<IReadOnlyList<string>> ResolveSmsAudienceAsync(
+        IApplicationDbContext dbContext, Guid organizationId, NotificationAudience audience, Guid? audienceRef, CancellationToken cancellationToken)
+    {
+        // Members of the rule's org (scoped EXPLICITLY to organizationId — NOT a cross-tenant join).
+        var memberQuery = dbContext.Memberships
+            .IgnoreQueryFilters()
+            .Where(m => m.OrganizationId == organizationId && m.Status == MembershipStatus.Active && !m.IsDeleted);
+
+        if (audience == NotificationAudience.Role && audienceRef is { } roleId)
+        {
+            memberQuery = memberQuery.Where(m => m.Roles.Any(r => r.RoleId == roleId));
+        }
+
+        var userIds = await memberQuery.Select(m => m.UserId).Distinct().ToListAsync(cancellationToken);
+        if (userIds.Count == 0)
+        {
+            return [];
+        }
+
+        // Consent is PER-(org, user) (docs/36 §4.1, D-3): read the consent record for THIS org only — the explicit
+        // OrganizationId predicate is the fix that stops a user's consent in org A leaking a send from org B. A user
+        // with no row for this org (default-OFF) is absent here ⇒ not consented ⇒ excluded.
+        var consentedUserIds = (await dbContext.SmsConsents
+            .IgnoreQueryFilters()
+            .Where(c => c.OrganizationId == organizationId && userIds.Contains(c.UserId) && c.Consented)
+            .Select(c => c.UserId)
+            .ToListAsync(cancellationToken))
+            .ToHashSet();
+
+        // Verified-phone facts for the org's members (org-scoped set membership; users are platform-global, so no org
+        // predicate — the userIds set is already the org's members). Filter on the scalar PhoneVerified flag (the
+        // invariant is PhoneVerified ⇒ PhoneE164 set); SmsAudience.Select defends against a blank/null number anyway.
+        var users = await dbContext.Users
+            .IgnoreQueryFilters()
+            .Where(u => userIds.Contains(u.Id) && !u.IsDeleted && u.PhoneVerified)
+            .Select(u => new { u.Id, Phone = u.PhoneE164!.Value })
+            .ToListAsync(cancellationToken);
+
+        var candidates = users.Select(u => new SmsAudienceCandidate(u.Phone, PhoneVerified: true, SmsAlerts: consentedUserIds.Contains(u.Id)));
+        var recipients = SmsAudience.Select(candidates);
+
+        // Suppression pre-filter (docs/36 §4.3, Slice D): drop any number currently opted out for this org (an active
+        // ledger row). The send-time check stays AUTHORITATIVE for the expand→send race; this just avoids expanding
+        // deliveries we'd only cancel. Org-scoped EXPLICITLY (the drain runs under bypass).
+        var suppressed = await SmsSuppression.ActiveAmongAsync(dbContext, organizationId, recipients, cancellationToken);
+        return suppressed.Count == 0 ? recipients : recipients.Where(p => !suppressed.Contains(p)).ToList();
+    }
+
     // --- Send: dispatch due deliveries via channel adapters, re-checking entitlement + loading channel config ---
     private async Task SendAsync(
         IApplicationDbContext dbContext, IReadOnlyDictionary<ChannelKind, INotificationChannel> channels,
-        IEffectiveFeatureSet effectiveFeatures, DateTimeOffset now, CancellationToken cancellationToken)
+        IEffectiveFeatureSet effectiveFeatures, DateTimeOffset now, int smsConfiguredCap, bool smsSendEnabled, CancellationToken cancellationToken)
     {
         var due = await dbContext.NotificationDeliveries
             .IgnoreQueryFilters()
@@ -471,6 +547,14 @@ public sealed class NotificationDispatchScheduler(IServiceScopeFactory scopeFact
                 continue;
             }
 
+            // DARK-BOUNDARY GATE (docs/36 §2/§10): while SMS sending is disabled, terminally Cancel an SMS delivery
+            // rather than dispatch it — belt-and-braces defence in depth on top of the empty audience resolver + the OTP
+            // send-gate, so Slice B is provably dark in CODE. Cancel (not defer) because there is no window to wait for.
+            if (NotificationSendPolicy.CancelIfSmsSendingDisabled(delivery, smsSendEnabled))
+            {
+                continue;
+            }
+
             // Quiet hours (docs/35 §5): if the rule's window (copied onto the delivery) is active NOW, DEFER to its end
             // rather than send — enforced here at SEND time against the current instant, so a delivery that became due
             // DURING quiet hours is held, and one whose window has since passed goes straight out. A defer is not a
@@ -491,7 +575,11 @@ public sealed class NotificationDispatchScheduler(IServiceScopeFactory scopeFact
             if (delivery.ChannelKind != ChannelKind.Email)
             {
                 configs.TryGetValue((delivery.OrganizationId, delivery.ChannelKind), out channelConfig);
-                if (channelConfig is null || !channelConfig.Enabled || string.IsNullOrWhiteSpace(channelConfig.DestinationUrl))
+                // SMS needs the encrypted credential AND the sender number (docs/36 §10); Chat needs the destination URL.
+                var configured = channelConfig is { Enabled: true } && (delivery.ChannelKind == ChannelKind.Sms
+                    ? !string.IsNullOrWhiteSpace(channelConfig.CredentialCiphertext) && !string.IsNullOrWhiteSpace(channelConfig.FromValue)
+                    : !string.IsNullOrWhiteSpace(channelConfig.DestinationUrl));
+                if (!configured)
                 {
                     // Not-yet-configured / temporarily disabled is TRANSIENT (an operator may set the destination shortly
                     // after creating the rule), so retry with backoff rather than terminally drop the event. Cancel stays
@@ -515,24 +603,73 @@ public sealed class NotificationDispatchScheduler(IServiceScopeFactory scopeFact
                     continue;
                 }
             }
+            else if (delivery.ChannelKind == ChannelKind.Sms)
+            {
+                // A2P pre-send gate (docs/36 §4.6, Slice D): no SMS until the operator attests their campaign is
+                // registered. Un-attested ⇒ HOLD (transient retry), not Cancel — so an alert queued just before the
+                // operator attests still goes out once they do. Checked before the cap/suppression/send.
+                if (NotificationSendPolicy.HoldIfA2pNotAttested(delivery, channelConfig, now))
+                {
+                    continue;
+                }
+
+                // Inbound-readiness gate (W2): no SMS until this org's STOP webhook has demonstrably received a
+                // correctly-signed request. A minted token is not enough — an unconnected webhook is, from the
+                // subscriber's side, the same as no webhook, and sending under it means messaging people with no
+                // working way to stop us. Also a transient HOLD, for the same reason as A2P above.
+                if (NotificationSendPolicy.HoldIfInboundNotReady(delivery, channelConfig, now))
+                {
+                    continue;
+                }
+
+                // SMS has a hard per-message cost — the cap is clamped to a FINITE floor + hard max, NEVER 0/uncapped
+                // (docs/36 §7; HasReached treats 0 as unlimited, so the clamp is essential).
+                var smsCap = NotificationSendPolicy.ResolveSmsDailyCap(smsConfiguredCap);
+                if (usage.HasReached(smsCap))
+                {
+                    delivery.Cancel("Daily SMS limit reached for this organisation");
+                    continue;
+                }
+
+                // Send-time suppression (docs/36 §4.3, Slice D) — AUTHORITATIVE for the expand→send race: a STOP that
+                // landed AFTER this delivery was expanded still stops the send. Suppressed ⇒ Cancel (terminal, no retry).
+                if (await SmsSuppression.IsSuppressedAsync(dbContext, delivery.OrganizationId, delivery.Recipient, cancellationToken))
+                {
+                    delivery.Cancel("Recipient has opted out of SMS");
+                    continue;
+                }
+            }
 
             try
             {
                 var result = await channel.SendAsync(
-                    new ChannelSendRequest(delivery.OrganizationId, delivery.Recipient, delivery.RenderedSubject, delivery.RenderedBody, delivery.DedupValue, channelConfig),
+                    new ChannelSendRequest(
+                        delivery.OrganizationId, delivery.Recipient, delivery.RenderedSubject, delivery.RenderedBody,
+                        delivery.DedupValue, channelConfig, delivery.Id),
                     cancellationToken);
 
-                if (result.Success)
+                // Carrier opt-out self-heal (docs/36 §4.3/§7, Slice D): a terminal Twilio 21610 (recipient/carrier opted
+                // out) appends a CarrierError suppression row so the NEXT resolve/send is pre-filtered — the backstop for
+                // when the inbound STOP forwarding is momentarily missed. Idempotent (no-op if already suppressed).
+                if (delivery.ChannelKind == ChannelKind.Sms && result.IsSuppressed)
                 {
-                    delivery.MarkSucceeded(result.StatusCode, now);
-                    usage.Increment();
+                    await SmsSuppression.AppendIfNotActiveAsync(
+                        dbContext, delivery.OrganizationId, delivery.Recipient, channelConfig?.FromValue,
+                        SmsOptOutSource.CarrierError, keyword: null, reason: null, now, cancellationToken);
                 }
-                else
-                {
-                    delivery.MarkFailed(result.StatusCode, result.Error, now);
-                }
+
+                // Success ⇒ Delivered + count the send; a terminal Suppressed (opt-out / Twilio 21610) ⇒ Cancel, never
+                // MarkFailed (which would re-hammer an opted-out number 6× on the backoff ladder); else ⇒ retry (docs/36 §7).
+                NotificationSendPolicy.ApplyResult(delivery, result, usage, now);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            // An inner HttpClient/provider timeout surfaces as TaskCanceledException — which IS an
+            // OperationCanceledException — even though OUR token was never cancelled. Only a cancellation of our own
+            // token means "the host is stopping"; everything else, timeouts included, is a retryable delivery failure.
+            // Letting a timeout escape here skips the batch SaveChangesAsync BELOW this loop, discarding the outcome of
+            // every delivery in the batch (Delivered marks for messages already sent, attempt counters, Cancels, usage
+            // increments, suppression rows) — and because Attempts never advances, the poison row stays at the front of
+            // the next ordered batch and re-sends everything ahead of it every tick.
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 logger.LogWarning(ex, "Notification delivery {DeliveryId} failed to send.", delivery.Id);
                 delivery.MarkFailed(null, ex.Message, now);

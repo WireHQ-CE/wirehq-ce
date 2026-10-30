@@ -35,11 +35,12 @@ public sealed class ApplicationDbContextInitializer(
 
         await WaitForDatabaseAsync(admin, cancellationToken);
 
-        // Once migrations are generated (`dotnet ef migrations add InitialCreate`) this applies them.
-        // Until then — e.g. a brand-new clone — fall back to EnsureCreated so the app runs immediately in
-        // development. The two are mutually exclusive; production always migrates.
+        // Once migrations exist this applies them. Until then — e.g. a brand-new clone with no chain — fall
+        // back to EnsureCreated so the app runs immediately in development. The two are mutually exclusive;
+        // production always migrates.
         if (admin.Database.GetMigrations().Any())
         {
+            await EnsureMigrationPreconditionsAsync(admin, cancellationToken);
             logger.LogInformation("Applying database migrations...");
             await admin.Database.MigrateAsync(cancellationToken);
             logger.LogInformation("Migrations applied.");
@@ -60,7 +61,7 @@ public sealed class ApplicationDbContextInitializer(
         // seeds them at migrate time; this covers a boot that happens months later). Runs as the owner, after
         // RLS so new partitions inherit the append-only default privileges. (ADR-031, docs/15 §5)
         // Skipped when audit_logs is a plain table: the partition DDL is raw SQL invisible to the EF model,
-        // so an EnsureCreated baseline or the Community Edition's squashed InitialCreate has none (docs/17 §7).
+        // so an EnsureCreated baseline or the Community Edition's frozen baseline has none (docs/17 §7, docs/37).
         if (await AuditPartitions.IsPartitionedAsync(admin, cancellationToken))
         {
             await AuditPartitions.EnsureMonthlyPartitionsAsync(admin, DateTime.UtcNow, monthsAhead: 3, cancellationToken);
@@ -70,6 +71,161 @@ public sealed class ApplicationDbContextInitializer(
             logger.LogInformation(
                 "audit.audit_logs is not partitioned (EnsureCreated or a squashed baseline) — skipping partition management.");
         }
+    }
+
+    /// <summary>
+    /// Refuses, BEFORE any DDL, to migrate a database the shipped chain cannot safely be applied to.
+    ///
+    /// Only engages on the Community Edition chain, detected from the DATA rather than from an edition flag:
+    /// the CE chain's first id is the frozen <c>00000000000000_InitialCreate</c>, the SaaS chain's is
+    /// <c>20260610090216_InitialCreate</c>. <c>GetMigrations()</c> is backed by a SortedList, so element 0 is
+    /// deterministically the ordinal-least id. Nothing to register, nothing to strip, and no way to unwire it
+    /// by dropping a DI line — which matters, because the failure it prevents is silent (docs/37 §3.4).
+    /// </summary>
+    private async Task EnsureMigrationPreconditionsAsync(
+        ApplicationDbContext admin, CancellationToken cancellationToken)
+    {
+        const string CeBaselineId = "00000000000000_InitialCreate";
+
+        var shipped = admin.Database.GetMigrations().ToList();
+        if (shipped.Count == 0 || shipped[0] != CeBaselineId)
+        {
+            return; // SaaS chain (or a future CE baseline id) — disengage rather than misbehave.
+        }
+
+        var applied = (await admin.Database.GetAppliedMigrationsAsync(cancellationToken)).ToList();
+
+        // The permanent witness for "the frozen baseline already ran here". identity.users is created by the
+        // baseline and may never be dropped (docs/17 §7.1). Probing anything a DELTA creates would
+        // misclassify a legitimately half-upgraded database.
+        var baselineWitness = await ObjectExistsAsync(admin, "identity.users", cancellationToken);
+
+        // 1) Fresh install. Deliberately does not also require an absent history table: EF creates that table
+        //    outside the first migration's transaction, so "history exists, empty, no tables" is a real
+        //    resumable state after a migrate job was killed at exactly the wrong instant.
+        if (applied.Count == 0 && !baselineWitness)
+        {
+            return;
+        }
+
+        // 2) Schema present but no migration history — an EnsureCreated development database, or an install
+        //    that predates the CE ever shipping a chain. EF would die on a raw "relation already exists".
+        if (applied.Count == 0)
+        {
+            throw DatabaseMigrationPreconditionException.Create(
+                summary: "Database has WireHQ tables but no migration history.",
+                found:
+                    "This database already contains WireHQ tables, but it has no record of any migration\n" +
+                    "having been applied. That happens when the schema was created directly (a development\n" +
+                    "database) rather than by the update job.",
+                remedy:
+                    "If this is a development database, recreate it from scratch.\n" +
+                    "If it holds data you need, take a backup with deploy/backup-db.sh and open an issue —\n" +
+                    "do not attempt to adopt it by hand.");
+        }
+
+        // 3) The database knows about a migration this build does not ship — i.e. this binary is OLDER than
+        //    the one that last ran. EF would silently apply nothing and start against a newer schema.
+        var unknown = applied.Except(shipped).ToList();
+        if (unknown.Count > 0)
+        {
+            if (configuration.GetValue("Migrations:AcknowledgeDowngrade", false))
+            {
+                logger.LogWarning(
+                    "Downgrade acknowledged: the database has {Count} migration(s) this build does not ship " +
+                    "({Ids}). Continuing because Migrations:AcknowledgeDowngrade=true. The newer schema is " +
+                    "left in place.", unknown.Count, string.Join(", ", unknown));
+            }
+            else
+            {
+                throw DatabaseMigrationPreconditionException.Create(
+                    summary: $"Database is newer than this build ({unknown.Count} unknown migration(s)).",
+                    found:
+                        "Your database has already been updated by a NEWER version of WireHQ than the one\n" +
+                        "you are running now:\n\n" +
+                        string.Join('\n', unknown.Select(id => $"  · {id}")),
+                    remedy:
+                        "This is normal if you deliberately went back to an older version. Going back is\n" +
+                        "supported, but we stop first so it is your decision rather than a surprise: the\n" +
+                        "newer schema stays as it is, and the older app runs against it.\n\n" +
+                        "To proceed, set this in deploy/.env and start again:\n" +
+                        "  Migrations__AcknowledgeDowngrade=true\n\n" +
+                        "To go forward instead, check out the newer version again and update as usual.");
+            }
+        }
+
+        // 4) A database created before the CE had a real migration chain: it carries the baseline id and
+        //    nothing else. Its baseline BODY may have been an older release's, since every CE release used to
+        //    ship different SQL under this same id. Verify it is v0.90.x-shaped before layering deltas on it.
+        if (applied.Count == 1 && applied[0] == CeBaselineId && shipped.Count > 1)
+        {
+            var hasPatterns = await ObjectExistsAsync(admin, "identity.notification_rule_patterns", cancellationToken);
+            var hasEscalation = await ColumnExistsAsync(
+                admin, "identity", "notification_jobs", "escalation_level", cancellationToken);
+
+            if (!hasPatterns || !hasEscalation)
+            {
+                var missing = new List<string>();
+                if (!hasPatterns) missing.Add("  · table identity.notification_rule_patterns");
+                if (!hasEscalation) missing.Add("  · column identity.notification_jobs.escalation_level");
+
+                throw DatabaseMigrationPreconditionException.Create(
+                    summary: "CE database predates v0.90.0; cannot be upgraded in place.",
+                    found:
+                        "This database was created by a Community Edition older than v0.90.0. Objects that\n" +
+                        "a v0.90.x install would have are missing:\n\n" +
+                        string.Join('\n', missing) + "\n\n" +
+                        "Earlier releases could not deliver schema changes to an existing install, so this\n" +
+                        "database never received them. Applying this version's updates on top would leave a\n" +
+                        "history that claims those objects exist when they do not.",
+                    remedy:
+                        "There is no in-place upgrade from a Community Edition older than v0.90.0.\n\n" +
+                        "Either restore your backup and stay on the version you were running, or start a\n" +
+                        "fresh install on this version and re-enter your configuration. Export anything you\n" +
+                        "need from the running older version FIRST.");
+            }
+
+            logger.LogInformation(
+                "Pre-chain CE database verified as v0.90.x-shaped; applying {Count} pending migration(s).",
+                shipped.Count - applied.Count);
+            return;
+        }
+
+        // 5) Baseline plus at least one delta already applied — an ordinary upgrade. Stated explicitly rather
+        //    than left to fall-through, so a future edit cannot change this case by accident.
+    }
+
+    private static async Task<bool> ObjectExistsAsync(
+        ApplicationDbContext admin, string qualifiedName, CancellationToken cancellationToken)
+    {
+        await using var command = admin.Database.GetDbConnection().CreateCommand();
+        command.CommandText = "SELECT to_regclass(@name) IS NOT NULL";
+        var p = command.CreateParameter();
+        p.ParameterName = "name";
+        p.Value = qualifiedName;
+        command.Parameters.Add(p);
+
+        await admin.Database.OpenConnectionAsync(cancellationToken);
+        return await command.ExecuteScalarAsync(cancellationToken) is true;
+    }
+
+    private static async Task<bool> ColumnExistsAsync(
+        ApplicationDbContext admin, string schema, string table, string column, CancellationToken cancellationToken)
+    {
+        await using var command = admin.Database.GetDbConnection().CreateCommand();
+        command.CommandText =
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns " +
+            "WHERE table_schema = @schema AND table_name = @table AND column_name = @column)";
+        foreach (var (name, value) in new[] { ("schema", schema), ("table", table), ("column", column) })
+        {
+            var p = command.CreateParameter();
+            p.ParameterName = name;
+            p.Value = value;
+            command.Parameters.Add(p);
+        }
+
+        await admin.Database.OpenConnectionAsync(cancellationToken);
+        return await command.ExecuteScalarAsync(cancellationToken) is true;
     }
 
     /// <summary>

@@ -403,6 +403,106 @@ public sealed class AgentGatewayTests(AgentGatewayFixture fixture) : IClassFixtu
         (await noCertClient.PostAsJsonAsync("/agent/v1/diagnostics", batch)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    [Fact]
+    public async Task A_rotation_keeps_the_old_cert_working_until_the_agent_heartbeats_on_the_new_one()
+    {
+        var api = _fixture.CreateApiClient();
+        await RegisterOwnerAsync(api);
+        var (agentId, oldCert) = await EnrollAsync(api);
+        using var oldClient = _fixture.CreateAgentClient(oldCert);
+
+        var (rotateCsr, rotateKey) = BuildCsr();
+        var rotate = await oldClient.PostAsJsonAsync("/agent/v1/cert/rotate", new { csr = rotateCsr });
+        rotate.StatusCode.Should().Be(HttpStatusCode.OK);
+        var rotated = (await rotate.Content.ReadFromJsonAsync<RotateResponse>())!;
+        rotated.NotAfterUtc.Should().BeAfter(DateTimeOffset.UtcNow.AddDays(40));
+
+        // Grace: until the agent proves it holds the new cert, the old one still authenticates — a lost response
+        // or a crash before the new cert is saved must not lock the agent out.
+        (await oldClient.PostAsJsonAsync("/agent/v1/heartbeat", new { })).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // The operator listing reports the new cert's expiry.
+        var listed = (await api.GetFromJsonAsync<List<AgentDto>>("/api/v1/agents"))!.Single(a => a.Id == agentId);
+        listed.CertificateNotAfterUtc.Should().BeCloseTo(rotated.NotAfterUtc, TimeSpan.FromSeconds(1));
+
+        // The first heartbeat on the new cert ends the grace: from then on the old cert is rejected.
+        using var newCert = BuildClientCertificate(rotated.CertificatePem, rotateKey);
+        using var newClient = _fixture.CreateAgentClient(newCert);
+        (await newClient.PostAsJsonAsync("/agent/v1/heartbeat", new { })).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var oldClientAgain = _fixture.CreateAgentClient(oldCert);
+        (await oldClientAgain.PostAsJsonAsync("/agent/v1/heartbeat", new { })).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await newClient.PostAsJsonAsync("/agent/v1/heartbeat", new { })).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task A_rotation_whose_response_was_lost_can_be_retried_with_the_old_cert()
+    {
+        var api = _fixture.CreateApiClient();
+        await RegisterOwnerAsync(api);
+        var (_, oldCert) = await EnrollAsync(api);
+        using var oldClient = _fixture.CreateAgentClient(oldCert);
+
+        // The first rotation "succeeds" server-side, but the agent never receives or never saves the cert.
+        var (lostCsr, lostKey) = BuildCsr();
+        var lost = (await (await oldClient.PostAsJsonAsync("/agent/v1/cert/rotate", new { csr = lostCsr }))
+            .Content.ReadFromJsonAsync<RotateResponse>())!;
+
+        // Retrying with the old cert works, and issues a fresh cert.
+        var (retryCsr, retryKey) = BuildCsr();
+        var retry = await oldClient.PostAsJsonAsync("/agent/v1/cert/rotate", new { csr = retryCsr });
+        retry.StatusCode.Should().Be(HttpStatusCode.OK);
+        var retried = (await retry.Content.ReadFromJsonAsync<RotateResponse>())!;
+
+        // The orphaned cert from the lost response is discarded — it must not linger as a usable credential.
+        using var lostCert = BuildClientCertificate(lost.CertificatePem, lostKey);
+        using var lostClient = _fixture.CreateAgentClient(lostCert);
+        (await lostClient.PostAsJsonAsync("/agent/v1/heartbeat", new { })).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        // The old cert keeps its grace across the retry, and the retried cert completes the rotation.
+        using var oldClientAgain = _fixture.CreateAgentClient(oldCert);
+        (await oldClientAgain.PostAsJsonAsync("/agent/v1/heartbeat", new { })).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var retriedCert = BuildClientCertificate(retried.CertificatePem, retryKey);
+        using var retriedClient = _fixture.CreateAgentClient(retriedCert);
+        (await retriedClient.PostAsJsonAsync("/agent/v1/heartbeat", new { })).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var oldClientFinal = _fixture.CreateAgentClient(oldCert);
+        (await oldClientFinal.PostAsJsonAsync("/agent/v1/heartbeat", new { })).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Disabling_an_agent_mid_rotation_rejects_both_its_old_and_new_certs()
+    {
+        var api = _fixture.CreateApiClient();
+        await RegisterOwnerAsync(api);
+        var (agentId, oldCert) = await EnrollAsync(api);
+        using var oldClient = _fixture.CreateAgentClient(oldCert);
+
+        var (csr, key) = BuildCsr();
+        var rotated = (await (await oldClient.PostAsJsonAsync("/agent/v1/cert/rotate", new { csr }))
+            .Content.ReadFromJsonAsync<RotateResponse>())!;
+
+        (await api.PostAsync($"/api/v1/agents/{agentId}/disable", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        using var oldClientAgain = _fixture.CreateAgentClient(oldCert);
+        (await oldClientAgain.PostAsJsonAsync("/agent/v1/heartbeat", new { })).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        using var newCert = BuildClientCertificate(rotated.CertificatePem, key);
+        using var newClient = _fixture.CreateAgentClient(newCert);
+        (await newClient.PostAsJsonAsync("/agent/v1/heartbeat", new { })).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    /// <summary>Enrols a fresh agent and returns its id + a client cert ready to present over mTLS.</summary>
+    private async Task<(Guid AgentId, X509Certificate2 Certificate)> EnrollAsync(HttpClient api)
+    {
+        var token = await MintTokenAsync(api);
+        var (csrPem, key) = BuildCsr();
+        using var noCertClient = _fixture.CreateAgentClient(null);
+        var enrolled = (await (await noCertClient.PostAsJsonAsync("/agent/v1/enroll",
+            new { token, csr = csrPem })).Content.ReadFromJsonAsync<EnrollResponse>())!;
+        return (enrolled.AgentId, BuildClientCertificate(enrolled.CertificatePem, key));
+    }
+
     private static async Task<string> RegisterOwnerAsync(HttpClient api)
     {
         var email = $"gw-owner+{Guid.NewGuid():N}@wirehq.test";
@@ -474,7 +574,8 @@ public sealed class AgentGatewayTests(AgentGatewayFixture fixture) : IClassFixtu
     private sealed record EnrollResponse(Guid AgentId, string CertificatePem, string CaCertificatePem, DateTimeOffset NotAfterUtc);
     private sealed record MintResponse(Guid Id, string Token, DateTimeOffset ExpiresAtUtc);
     private sealed record LoginResponse(string AccessToken);
-    private sealed record AgentDto(Guid Id, string Name, string Status, string? Platform, string? Version, int ManagedInstances, int InstancesWithDrift);
+    private sealed record AgentDto(Guid Id, string Name, string Status, string? Platform, string? Version, int ManagedInstances, int InstancesWithDrift, DateTimeOffset? CertificateNotAfterUtc);
+    private sealed record RotateResponse(string CertificatePem, string CaCertificatePem, DateTimeOffset NotAfterUtc);
     private sealed record TargetStatusDto(bool HasDrift);
     private sealed record DeploymentSummaryDto(Guid Id, string Status);
     private sealed record IdResponse(Guid Id);

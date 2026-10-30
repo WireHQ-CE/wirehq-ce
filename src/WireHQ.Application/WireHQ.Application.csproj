@@ -16,6 +16,13 @@
     <ProjectReference Include="..\WireHQ.Domain\WireHQ.Domain.csproj" />
   </ItemGroup>
 
+  <!-- Expose internal send-path helpers (NotificationShapeGating, NotificationSendPolicy) to the unit tests so the
+       spend-safety rules the adversarial review flagged (cap clamp, Suppressed→Cancel, SMS shape-gating) are covered
+       without widening the public API (docs/36 §10). -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="WireHQ.Application.UnitTests" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="MediatR" />
     <PackageReference Include="FluentValidation" />

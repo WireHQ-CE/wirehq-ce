@@ -27,8 +27,11 @@ public sealed class AgentGatewayFixture : IAsyncLifetime
 
     private Process? _process;
 
-    public int MainPort { get; } = FreeTcpPort();
-    public int AgentPort { get; } = FreeTcpPort();
+    // Per instance: two test classes share this fixture type and may run in parallel.
+    public AgentGatewayFixture() => (MainPort, AgentPort) = TwoFreeTcpPorts();
+
+    public int MainPort { get; }
+    public int AgentPort { get; }
 
     public HttpClient CreateApiClient() => new() { BaseAddress = new Uri($"http://localhost:{MainPort}") };
 
@@ -166,12 +169,20 @@ public sealed class AgentGatewayFixture : IAsyncLifetime
         return (apiDirectory, Path.Combine(apiDirectory, "WireHQ.Api.dll"));
     }
 
-    private static int FreeTcpPort()
+    /// <summary>
+    /// Two distinct free ports. Both listeners are held open until both ports are known — releasing the first
+    /// before asking for the second lets the OS hand the same port back twice, and the API then fails to bind
+    /// its second listener ("address already in use").
+    /// </summary>
+    private static (int, int) TwoFreeTcpPorts()
     {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
+        var first = new TcpListener(IPAddress.Loopback, 0);
+        var second = new TcpListener(IPAddress.Loopback, 0);
+        first.Start();
+        second.Start();
+        var ports = (((IPEndPoint)first.LocalEndpoint).Port, ((IPEndPoint)second.LocalEndpoint).Port);
+        first.Stop();
+        second.Stop();
+        return ports;
     }
 }
